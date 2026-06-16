@@ -24,7 +24,7 @@ RQ3: What sparsity level gives the best tradeoff among:
 
 RQ4: Do sparse SNNs at their best sparsity level outperform equally parameterized ANN baselines on continual learning benchmarks?
 
-RQ5: What mechanism links spike sparsity to reduced catastrophic forgetting?Ṅ
+RQ5: What mechanism links spike sparsity to reduced catastrophic forgetting?
 
 ## 2. Hypotheses
 
@@ -52,19 +52,19 @@ Test: Fit a quadratic regression to accuracy as a function of sparsity and test 
 
 ## 3. Testing the proposed mechanism
 
-The central risk in this project is mistaking correlation for causation. Lower forgetting at some sparsity levels would not, by itself, prove that sparsity caused lower interference. The experiments therefore need to measure the proposed mechanism directly.
+A lower forgetting score would not, by itself, show that sparsity caused lower interference. The study therefore measures the proposed mechanism directly instead of treating the accuracy curve as enough evidence.
 
 ### 3.1 Representational overlap
 
 - Cosine similarity: Measure cosine similarity between hidden-state activations for task A and task B across sparsity levels.
 - PCA overlap: Project hidden representations onto principal components and measure overlap between task subspaces.
-- Expected pattern: Higher sparsity should reduce cosine similarity and PCA overlap, and those reductions should correspond to lower forgetting.
+- Expected pattern: Higher sparsity should reduce cosine similarity and PCA overlap. Those reductions should line up with lower forgetting.
 
 ### 3.2 Ablation study
 
 - Post-hoc sparsity manipulation: After training on task A, increase or decrease sparsity before training on task B and then measure forgetting.
 - Control condition: Compare against networks where sparsity is not changed after task A.
-- Expected result: If sparsity has a causal role, changing sparsity after task A should change forgetting on task A after learning task B.
+- Expected pattern: If sparsity has a causal role, changing sparsity after task A should change forgetting on task A after learning task B.
 
 ### 3.3 Learning-rate control
 
@@ -186,7 +186,7 @@ This project focuses on spike sparsity rather than weight sparsity. The distinct
 
 ## 7. Biological interpretation
 
-The biological motivation should be stated carefully. Sparse activity is common in biological neural systems, but the mechanisms that produce it are complex. They include inhibitory circuits, homeostatic plasticity, and metabolic constraints. Threshold tuning, winner-take-all rules, and activity penalties are simplified computational controls, not direct models of those mechanisms.
+The biological motivation needs a narrow interpretation. Sparse activity is common in biological neural systems, but the mechanisms that produce it are complex. They include inhibitory circuits, homeostatic plasticity, and metabolic constraints. Threshold tuning, winner-take-all rules, and activity penalties are simplified computational controls, not direct models of those mechanisms.
 
 The paper should therefore treat biological sparsity as motivation for the hypothesis, not as evidence that the proposed SNN model is biologically realistic. Relevant neuroscience references include Olshausen and Field (1996) on sparse coding and Buzsaki (2006) on neural rhythms.
 
@@ -194,26 +194,26 @@ The paper should therefore treat biological sparsity as motivation for the hypot
 
 ### 8.1 H1: Moderate sparsity
 
-Expected result: Activity levels of 20-40% reduce forgetting by at least 30% compared with dense baselines.
+Prediction: Activity levels of 20-40% reduce forgetting by at least 30% compared with dense baselines.
 
-Required evidence:
+Evidence needed:
 
 - Forgetting score at 20-40% activity is less than 0.7 x the forgetting score at 100% activity, with p < 0.05
 - Cosine similarity between task representations decreases as sparsity increases
 
 ### 8.2 H2: Extreme sparsity
 
-Expected result: Activity below 5% reduces accuracy by at least 50%.
+Prediction: Activity below 5% reduces accuracy by at least 50%.
 
-Required evidence:
+Evidence needed:
 
 - Accuracy at 1% and 5% activity is less than 0.5 x baseline accuracy, with p < 0.05
 
 ### 8.3 H3: Non-linear tradeoff
 
-Expected result: Performance follows an inverted-U curve, with the best range near 20-40% activity.
+Prediction: Performance follows an inverted-U curve, with the best range near 20-40% activity.
 
-Required evidence:
+Evidence needed:
 
 - Quadratic regression shows significant non-linearity, with p < 0.05
 - The estimated peak lies within the 20-40% activity range
