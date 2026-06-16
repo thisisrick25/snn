@@ -1,280 +1,248 @@
-# Investigating the Relationship Between Spike Sparsity and Catastrophic Forgetting in Continual Learning Spiking Neural Networks
+# Investigating the relationship between spike sparsity and catastrophic forgetting in continual learning spiking neural networks
 
-## Version 2.0 — Addressing Peer Review Feedback
+## Research statement
 
----
+Catastrophic forgetting is a persistent problem in continual learning. Artificial neural networks often lose performance on earlier tasks after training on new ones. Biological brains, in contrast, learn over long periods while using sparse neural activity. Spiking neural networks (SNNs) are a useful setting for testing whether sparse, event-driven activity can reduce interference between task representations.
 
-## Research Statement
+This project asks whether spike sparsity reduces catastrophic forgetting in SNNs, where the useful sparsity range lies, and whether the effect is explained by lower representational overlap between tasks.
 
-**Catastrophic forgetting remains a fundamental barrier to deploying neural networks in real-world continual learning scenarios.** Artificial neural networks (ANNs) rapidly lose previously acquired knowledge upon training on new tasks, while biological brains exhibit remarkable lifelong learning alongside inherently sparse neural activity. Spiking neural networks (SNNs), which naturally manifest sparse, event-driven communication, present an intriguing hypothesis: that the very sparsity that makes SNNs energy-efficient may also confer resilience against catastrophic forgetting by reducing interference between task representations.
+## 1. Research questions
 
-**This research investigates whether increasing spike sparsity reduces catastrophic forgetting in SNNs, identifies the optimal sparsity region, and establishes the causal mechanism linking sparsity to reduced interference.**
+### 1.1 Primary question
 
----
+RQ1: Does increasing spike sparsity reduce catastrophic forgetting in spiking neural networks?
 
-## 1. Research Questions (Refined)
+### 1.2 Secondary questions
 
-### 1.1 Primary Question
-**RQ1:** Does increasing spike sparsity reduce catastrophic forgetting in spiking neural networks?
+RQ2: How does spike sparsity affect retention of previously learned tasks across different continual learning protocols?
 
-### 12. Secondary Questions (Operationalized)
-**RQ2:** How does spike sparsity affect retention of previously learned tasks across different continual learning protocols?
+RQ3: What sparsity level gives the best tradeoff among:
 
-**RQ3:** What sparsity level provides the optimal trade-off between:
-- Classification accuracy (≥ 90% of baseline performance)
-- Forgetting rate (≤ 20% degradation from peak performance)
-- Energy efficiency (spike count × synaptic operations)
+- Classification accuracy, with a target of at least 90% of baseline performance
+- Forgetting rate, with a target of no more than 20% degradation from peak performance
+- Energy efficiency, estimated from spike count and synaptic operations
 
-**RQ4:** Do sparse SNNs (at optimal sparsity) outperform equally parameterized ANN baselines in continual learning benchmarks?
+RQ4: Do sparse SNNs at their best sparsity level outperform equally parameterized ANN baselines on continual learning benchmarks?
 
-**RQ5:** What is the causal mechanism linking spike sparsity to reduced catastrophic forgetting?
+RQ5: What mechanism links spike sparsity to reduced catastrophic forgetting?Ṅ
 
----
+## 2. Hypotheses
 
-## 2. Hypotheses (Testable & Falsifiable)
+### H1: Moderate spike sparsity reduces forgetting
 
-### H1: Moderately Sparse SNNs Exhibit Reduced Forgetting
-**Prediction:** SNNs with 20-40% activity levels will show ≥ 30% reduction in forgetting compared to dense baselines.
+Prediction: SNNs with 20-40% activity will show at least a 30% reduction in forgetting compared with dense baselines.
 
-**Mechanism:** Sparse activity reduces representational overlap between tasks. When fewer neurons are active, the probability of weight updates interfering with previously learned representations decreases.
+Mechanism: Sparse activity should reduce overlap between task representations. When fewer neurons are active, fewer weight updates should interfere with representations learned for earlier tasks.
 
-**Test:** Measure forgetting score (F = best_accuracy - current_accuracy) across sparsity levels from 1% to 95%.
+Test: Measure the forgetting score, defined as best_accuracy - current_accuracy, across sparsity levels from 1% to 95%.
 
-### H2: Extremely Sparse SNNs Underperform Due to Capacity Constraints
-**Prediction:** SNNs with < 5% activity levels will show ≥ 50% accuracy degradation compared to dense baselines.
+### H2: Extreme sparsity harms accuracy
 
-**Mechanism:** Insufficient active neurons cannot represent task-specific features, leading to underfitting.
+Prediction: SNNs with less than 5% activity will show at least a 50% accuracy drop compared with dense baselines.
 
-**Test:** Measure classification accuracy at 1%, 5%, and 10% activity levels.
+Mechanism: If too few neurons are active, the network may not have enough capacity to represent task-specific features.
 
-### H3: Optimal Sparsity Region Exists
-**Prediction:** An inverted-U relationship exists between sparsity and continual learning performance, with peak performance at 20-40% activity levels.
+Test: Measure classification accuracy at 1%, 5%, and 10% activity.
 
-**Test:** Fit a quadratic regression to accuracy vs. sparsity and test for non-linearity (F-test, p < 0.05).
+### H3: The sparsity-performance relationship is non-linear
 
----
+Prediction: Continual learning performance will follow an inverted-U pattern, with the best performance around 20-40% activity.
 
-## 3. Addressing the Causal Mechanism (New Section)
+Test: Fit a quadratic regression to accuracy as a function of sparsity and test for non-linearity with an F-test at p < 0.05.
 
-**Challenge from Reviewers:** Correlation ≠ Causation. Sparsity may correlate with reduced forgetting without causing it.
+## 3. Testing the proposed mechanism
 
-**Solution:** We will directly measure the proposed causal mechanism:
+The central risk in this project is mistaking correlation for causation. Lower forgetting at some sparsity levels would not, by itself, prove that sparsity caused lower interference. The experiments therefore need to measure the proposed mechanism directly.
 
-### 3.1 Representational Overlap Measurement
-- **Cosine Similarity:** Measure cosine similarity between hidden state activations for task A and task B across different sparsity levels.
-- **PCA Overlap:** Project representations onto principal components and measure overlap in subspaces.
-- **Predicted Pattern:** Higher sparsity → lower cosine similarity → reduced forgetting
+### 3.1 Representational overlap
 
-### 3.2 Ablation Study
-- **Post-hoc Sparsity Manipulation:** After training on task A, artificially increase/decrease sparsity before task B and measure forgetting.
-- **Control:** Compare to networks where sparsity is not manipulated.
-- **Expected:** Sparsity manipulation post-training should still affect forgetting, establishing causality.
+- Cosine similarity: Measure cosine similarity between hidden-state activations for task A and task B across sparsity levels.
+- PCA overlap: Project hidden representations onto principal components and measure overlap between task subspaces.
+- Expected pattern: Higher sparsity should reduce cosine similarity and PCA overlap, and those reductions should correspond to lower forgetting.
 
-### 3.3 Learning Rate Control
-- **Confound Check:** Ensure equal learning rates across sparsity levels.
-- **Sensitivity Analysis:** Test if findings hold across learning rates (0.001, 0.0001, 0.00001).
+### 3.2 Ablation study
 
----
+- Post-hoc sparsity manipulation: After training on task A, increase or decrease sparsity before training on task B and then measure forgetting.
+- Control condition: Compare against networks where sparsity is not changed after task A.
+- Expected result: If sparsity has a causal role, changing sparsity after task A should change forgetting on task A after learning task B.
 
-## 4. Methodology (Addressing Confounds)
+### 3.3 Learning-rate control
+
+- Confound check: Keep the main learning rate fixed across sparsity levels.
+- Sensitivity analysis: Repeat key experiments with learning rates of 0.001, 0.0001, and 0.00001.
+
+## 4. Methodology
 
 ### 4.1 Models
 
-#### ANN Baseline → Multi-Layer Perceptron (MLP)
-- **Architecture:** Input → Hidden(256) → Hidden(256) → Output
-- **Activation:** ReLU
-- **Parameters:** ~260K (matched to SNN for fair comparison)
-- **Justification:** While CNNs are standard for image tasks, MLPs allow direct comparison of sparsity effects without convolutions confounding the analysis. Results will be validated on a simplified ConvNet.
+#### ANN baseline: Multi-layer perceptron
 
-#### SNN Baseline → Leaky Integrate-and-Fire (LIF)
-- **Library:** snntorch
-- **Neuron Model:** LIF with parameters:
-  - τ_mem = 20ms (membrane time constant)
-  - V_thresh = 1.0 (firing threshold)
-  - V_rest = 0.0 (resting potential)
-  - V_reset = 0.0 (reset potential after spike)
-- **Justification for LIF:** LIF is the foundational SNN model. While adaptive LIF or Izhikevich neurons offer richer dynamics, LIF captures the core sparsity mechanism. Future work will extend to adaptive models.
+- Architecture: Input, hidden layer with 256 units, hidden layer with 256 units, output layer
+- Activation: ReLU
+- Parameter count: About 260K, matched to the SNN where possible
+- Rationale: CNNs are standard for image tasks, but an MLP makes it easier to isolate sparsity effects without convolutional feature sharing. A simplified ConvNet can be used as a secondary validation model.
 
-### 4.2 Sparsity Manipulation (Addressing Equivalence)
+#### SNN baseline: Leaky integrate-and-fire network
 
-**Challenge from Reviewers:** Three different sparsity mechanisms create different topologies (neuron-level, population-level, weight-level).
+- Library: snntorch
+- Neuron model: LIF
+- Membrane time constant: tau_mem = 20 ms
+- Firing threshold: V_thresh = 1.0
+- Resting potential: V_rest = 0.0
+- Reset potential after spike: V_reset = 0.0
+- Rationale: LIF is the simplest standard SNN model and is suitable for an initial test of spike sparsity. Adaptive LIF or Izhikevich neurons can be used later to test whether the findings hold with richer neuron dynamics.
 
-**Solution:** Map all mechanisms to a common metric: **percentage of active neurons**.
+### 4.2 Sparsity manipulation
 
-| Mechanism | How It Controls Sparsity | Target Activity Levels |
+The three sparsity mechanisms may not be equivalent, so each will be calibrated to the same observed activity metric: percentage of active neurons.
+
+| Mechanism | How sparsity is controlled | Target activity levels |
 |---|---|---|
-| **Spike Threshold** | Higher θ → fewer spikes | 1%, 5%, 10%, 20%, 40%, 60%, 80%, 95% |
-| **Winner-Take-All** | Only top-k neurons fire | Matched to target activity levels above |
-| **Activity Regularization** | Penalty on high activity | λ tuned to achieve target activity levels |
+| Spike threshold | Higher theta produces fewer spikes | 1%, 5%, 10%, 20%, 40%, 60%, 80%, 95% |
+| Winner-take-all | Only the top-k neurons fire | Matched to the same activity levels |
+| Activity regularization | A penalty discourages high activity | Regularization strength tuned to the same activity levels |
 
-**Validation:** Each mechanism will be calibrated independently to achieve the same target activity levels. A consistency check will verify that all three mechanisms produce comparable results at equivalent activity levels.
+Validation: Each mechanism will be tuned independently to reach the target activity levels. Results will be reported both by activity level and by sparsity mechanism, so the analysis does not treat mechanistically different interventions as identical.
 
-### 4.3 Continual Learning Protocol
+### 4.3 Continual learning protocol
 
-#### Benchmark: Split-MNIST & Permuted-MNIST
-- **Split-MNIST:** 5 binary classification tasks (digits 0-1, 2-3, 4-5, 6-7, 8-9)
-- **Permuted-MNIST:** 10 tasks, each a random pixel permutation of MNIST
-- **Justification:** Standard CL benchmarks enabling comparison with prior work.
+#### Benchmarks
 
-#### Task Protocol
-- **Task-Incremental:** Task labels provided during inference (standard CL setup)
-- **Task Ordering:** Fixed (not random) to ensure reproducibility
-- **Task Boundaries:** Explicit (known when switching tasks)
+- Split-MNIST: Five binary classification tasks, digits 0-1, 2-3, 4-5, 6-7, and 8-9
+- Permuted-MNIST: Ten tasks, each using a different random pixel permutation of MNIST
+- Optional extension: CIFAR-10 or CIFAR-100 after the MNIST-scale experiments are complete
 
-#### Training Details
-- **Optimizer:** Adam (lr = 0.001)
-- **Batch Size:** 128 (MNIST), 64 (CIFAR-10)
-- **Epochs:** 10 per task (MNIST), 20 (CIFAR)
-- **Statistical Testing:** Paired t-test (p < 0.05) for significance testing across sparsity levels
+These benchmarks are standard in continual learning and allow comparison with prior work.
 
-### 4.4 Continual Learning Methods (Expanded Based on Review)
+#### Task setting
 
-| Method | Type | Reason for Inclusion |
+- Setting: Task-incremental learning, with task labels available at inference time
+- Task order: Fixed order for reproducibility
+- Task boundaries: Explicit boundaries between tasks
+
+#### Training details
+
+- Optimizer: Adam with learning rate 0.001
+- Batch size: 128 for MNIST and 64 for CIFAR experiments
+- Epochs: 10 per MNIST task and 20 per CIFAR task
+- Statistical testing: Paired t-tests at p < 0.05 for comparisons across sparsity levels, plus F-tests for non-linearity in the sparsity-performance curve
+
+### 4.4 Continual learning methods
+
+| Method | Type | Reason for inclusion |
 |---|---|---|
-| **Naive Sequential Learning** | Baseline | Reference for maximum forgetting |
-| **Replay Buffer** | Rehearsal | Strongest practical baseline (buffer size = 200) |
-| **Elastic Weight Consolidation (EWC)** | Regularization | Classic CL algorithm; Fisher matrix estimation |
-| **Synaptic Intelligence (SI)** | Regularization | Online parameter importance; biologically inspired |
-| **Learning without Forgetting (LwF)** | Distillation | Standard baseline; knowledge distillation across tasks |
-| **PackNet (Optional)** | Parameter Isolation | Represents architecture-based methods |
+| Naive sequential learning | Baseline | Reference condition for maximum forgetting |
+| Replay buffer | Rehearsal | Strong practical baseline, buffer size = 200 |
+| Elastic Weight Consolidation | Regularization | Classic continual learning method using Fisher-based parameter importance |
+| Synaptic Intelligence | Regularization | Online parameter-importance method with biological motivation |
+| Learning without Forgetting | Distillation | Standard distillation-based continual learning baseline |
+| PackNet | Parameter isolation | Optional architecture-based comparison |
 
-**Missing Methods Acknowledged:** Parameter isolation (PackNet, Progressive Networks) and gradient projection methods will be included in extended evaluation.
+Gradient projection and parameter isolation methods can be included in the extended evaluation if the core experiments show a clear sparsity effect.
 
----
+## 5. Evaluation metrics
 
-## 5. Evaluation Metrics (Refined)
+### 5.1 Forgetting metrics
 
-### 5.1 Forgetting Metrics
-1. **Backward Transfer (BWT):** Average accuracy on previous tasks after learning all tasks
-2. **Forgetting Score (F):** F = max_accuracy - current_accuracy (per task)
-3. **Forward Transfer (FWT):** Average accuracy improvement on future tasks after learning current task
+1. Backward transfer (BWT): Average effect of learning later tasks on earlier task performance.
+2. Forgetting score (F): max_accuracy - current_accuracy for each task.
+3. Forward transfer (FWT): Effect of learning current tasks on later task performance.
 
-### 5.2 Accuracy Metrics
-1. **Average Task Accuracy:** Mean accuracy across all tasks after sequential training
-2. **Final Average Accuracy:** Accuracy averaged over all tasks at the end of training
+### 5.2 Accuracy metrics
 
-### 5.3 Sparsity & Efficiency Metrics
-1. **Spike Rate:** Average spikes per neuron per time step
-2. **Sparsity Index:** Percentage of inactive neurons
-3. **Energy Proxy:** E = spike_count × synaptic_operations (following neuromorphic literature conventions)
+1. Average task accuracy: Mean accuracy across tasks after sequential training.
+2. Final average accuracy: Mean accuracy across all tasks at the end of training.
 
-### 5.4 Mechanistic Metrics
-1. **Cosine Similarity:** Between task-specific hidden representations
-2. **PCA Overlap:** Shared variance in principal component subspaces
-3. **Synaptic Overlap:** Correlation in weight updates between tasks
+### 5.3 Sparsity and efficiency metrics
 
----
+1. Spike rate: Average spikes per neuron per time step.
+2. Sparsity index: Percentage of inactive neurons.
+3. Energy proxy: spike_count x synaptic_operations, following common neuromorphic efficiency estimates.
 
-## 6. Related Work Foundation (Addressing Missing Citations)
+### 5.4 Mechanistic metrics
 
-### Key References (Required for Context)
-- **Kirkpatrick et al. (2017):** Overcoming catastrophic forgetting in neural networks (EWC)
-- **Lopez-Paz & Ranzato (2017):** Gradient episodic memory for continual learning
-- **Zenke et al. (2017):** Continual learning through synaptic intelligence
-- **Pfeiffer & Pfeil (2018):** Deep learning with spiking neurons (SNN review)
-- **Mascoli et al. (2022):** Recent SNN continual learning work
+1. Cosine similarity between task-specific hidden representations.
+2. PCA overlap between task representation subspaces.
+3. Synaptic overlap, measured as correlation in weight updates between tasks.
 
-### Explicit Differentiation from ANN Sparsity
-**Challenge from Reviewers:** How is this different from ANN sparsity work (lottery tickets, sparse networks)?
+## 6. Related work foundation
 
-**Response:**
-1. **Spike Sparsity ≠ Weight Sparsity:** Spike sparsity refers to temporal sparsity in neural activations, not structural sparsity in weights.
-2. **Temporal Dynamics:** SNN spike sparsity introduces a temporal dimension not present in ANN activation sparsity.
-3. **Energy Efficiency:** SNN spike sparsity directly maps to energy consumption on neuromorphic hardware.
-4. **Biological Grounding:** Spike sparsity is a biologically observed phenomenon with direct neural correlates.
+### Key references
 
----
+- Kirkpatrick et al. (2017): Elastic Weight Consolidation for catastrophic forgetting
+- Lopez-Paz and Ranzato (2017): Gradient episodic memory for continual learning
+- Zenke et al. (2017): Synaptic Intelligence
+- Pfeiffer and Pfeil (2018): Review of deep learning with spiking neurons
+- Mascoli et al. (2022): Recent work on SNN continual learning, citation to be verified
 
-## 7. Biological Plausibility (Addressed)
+### Difference from ANN sparsity work
 
-**Challenge from Reviewers:** Biological claims are superficial.
+This project focuses on spike sparsity rather than weight sparsity. The distinction matters for four reasons:
 
-**Resolution:** Two possible approaches:
+1. Spike sparsity is temporal activation sparsity, not structural sparsity in the parameter matrix.
+2. SNNs add time-dependent membrane and spike dynamics that are absent from ordinary ANN activation sparsity.
+3. Spike counts map more directly to energy use on neuromorphic hardware.
+4. Spike sparsity has a biological analogue, although the experiments here do not claim full biological fidelity.
 
-### Option A: Deep Engagement (Preferred)
-- Reference specific biological mechanisms: inhibitory circuits (OLM cells, SOM interneurons), homeostatic plasticity, and metabolic constraints as sources of biological sparsity.
-- Connect to experimental neuroscience: sparse coding in olfactory bulb, hippocampal place cells.
-- Cite: Olshausen & Field (1996) sparse coding; Buzsáki (2006) neural syntax.
+## 7. Biological interpretation
 
-### Option B: Explicit Qualification
-- Acknowledge that biological sparsity mechanisms are complex and not fully captured by our simplified sparsity controls.
-- Frame biological inspiration as motivation, not claim of biological fidelity.
-- **Recommended for this draft:** Option B (to avoid overreach)
+The biological motivation should be stated carefully. Sparse activity is common in biological neural systems, but the mechanisms that produce it are complex. They include inhibitory circuits, homeostatic plasticity, and metabolic constraints. Threshold tuning, winner-take-all rules, and activity penalties are simplified computational controls, not direct models of those mechanisms.
 
----
+The paper should therefore treat biological sparsity as motivation for the hypothesis, not as evidence that the proposed SNN model is biologically realistic. Relevant neuroscience references include Olshausen and Field (1996) on sparse coding and Buzsaki (2006) on neural rhythms.
 
-## 8. Expected Results & Predictions
+## 8. Expected results and required evidence
 
-### 8.1 Primary Hypothesis (H1)
-**Expected:** Moderate sparsity (20-40% activity) shows ≥ 30% reduction in forgetting compared to dense baselines.
+### 8.1 H1: Moderate sparsity
 
-**Evidence Needed:**
-- Forgetting score at 20-40% sparsity < 0.7 × forgetting score at 100% sparsity (p < 0.05)
-- Cosine similarity between task representations decreases with increasing sparsity
+Expected result: Activity levels of 20-40% reduce forgetting by at least 30% compared with dense baselines.
 
-### 8.2 Secondary Hypothesis (H2)
-**Expected:** Sparsity < 5% shows ≥ 50% accuracy degradation.
+Required evidence:
 
-**Evidence Needed:**
-- Accuracy at 1% and 5% sparsity < 0.5 × baseline accuracy (p < 0.05)
+- Forgetting score at 20-40% activity is less than 0.7 x the forgetting score at 100% activity, with p < 0.05
+- Cosine similarity between task representations decreases as sparsity increases
 
-### 8.3 Tertiary Hypothesis (H3)
-**Expected:** Inverted-U relationship with peak at 20-40% sparsity.
+### 8.2 H2: Extreme sparsity
 
-**Evidence Needed:**
-- Quadratic regression shows significant non-linearity (F-test, p < 0.05)
-- Peak accuracy within 20-40% sparsity range
+Expected result: Activity below 5% reduces accuracy by at least 50%.
 
----
+Required evidence:
 
-## 9. Limitations & Future Work
+- Accuracy at 1% and 5% activity is less than 0.5 x baseline accuracy, with p < 0.05
 
-### 9.1 Current Limitations
-1. **Simplified Neuron Model:** LIF lacks adaptive thresholds and refractory period dynamics. Future work will use adaptive LIF or Izhikevich models.
-2. **Benchmark Scope:** Split-MNIST and Permuted-MNIST are relatively simple. Future work will extend to CIFAR-10/100 and real-world datasets.
-3. **Sparsity Mechanisms:** Three different sparsity mechanisms may create different topological effects. Future work will analyze each mechanism separately.
-4. **Biological Simplification:** Our sparsity controls are simplified compared to biological sparse coding mechanisms.
+### 8.3 H3: Non-linear tradeoff
 
-### 9.2 Future Directions
-1. **Adaptive Sparsity:** Allow sparsity to adapt during training based on task difficulty.
-2. **Recurrent Architectures:** Extend to recurrent SNNs (RSNNs) for temporal sequence tasks.
-3. **Neuromorphic Hardware Validation:** Validate energy efficiency claims on Intel Loihi or IBM TrueNorth.
-4. **Biological Experiments:** Collaborate with neuroscience labs to test if biological sparsity correlates with reduced interference.
+Expected result: Performance follows an inverted-U curve, with the best range near 20-40% activity.
 
----
+Required evidence:
+
+- Quadratic regression shows significant non-linearity, with p < 0.05
+- The estimated peak lies within the 20-40% activity range
+
+## 9. Limitations and future work
+
+### 9.1 Current limitations
+
+1. Simplified neuron model: LIF lacks adaptive thresholds and refractory-period dynamics. Later work should test adaptive LIF or Izhikevich models.
+2. Benchmark scope: Split-MNIST and Permuted-MNIST are useful first benchmarks but relatively simple. Later work should test CIFAR-10, CIFAR-100, and more realistic datasets.
+3. Sparsity mechanisms: Threshold tuning, winner-take-all selection, and activity regularization may produce different representational effects even at matched activity levels.
+4. Biological simplification: The sparsity controls are computational approximations and do not model the full biological basis of sparse coding.
+
+### 9.2 Future directions
+
+1. Adaptive sparsity: Allow sparsity to change during training based on task difficulty.
+2. Recurrent architectures: Extend the experiments to recurrent SNNs for temporal sequence tasks.
+3. Neuromorphic hardware validation: Test energy-efficiency claims on hardware such as Intel Loihi or IBM TrueNorth.
+4. Biological experiments: Collaborate with neuroscience labs to test whether biological sparsity correlates with reduced interference in relevant learning settings.
 
 ## 10. References
 
-1. McCloskey & Cohen (1989) — Catastrophic interference in connectionist networks
-2. Kirkpatrick et al. (2017) — Overcoming catastrophic forgetting in neural networks (EWC)
-3. Lopez-Paz & Ranzato (2017) — Gradient episodic memory for continual learning
-4. Zenke et al. (2017) — Continual learning through synaptic intelligence
-5. Pfeiffer & Pfeil (2018) — Deep learning with spiking neurons
-6. Mascoli et al. (2022) — SNN continual learning (TBD)
-7. Olshausen & Field (1996) — Emergence of simple-cell receptive field properties by learning a sparse code
-8. Buzsáki (2006) — Rhythms of the brain
-9. [arXiv:2507.18139] — Spike sparsity in SNNs
-10. [arXiv:2602.12236] — SNN continual learning
-
----
-
-## Appendix: Reviewer Concern → Our Response Mapping
-
-| Reviewer Concern | Our Response in This Draft |
-|---|---|
-| **Causal mechanism unproven** | Added Section 3: Direct measurement of representational overlap + ablation studies |
-| **Sparsity methods confounded** | Section 4.2: All mechanisms mapped to common "percentage active neurons" metric |
-| **Benchmark not specified** | Section 4.3: Split-MNIST & Permuted-MNIST explicitly named |
-| **Missing LwF baseline** | Section 4.4: LwF added to evaluation |
-| **LIF too simple** | Section 4.1: Justified as foundational; adaptive LIF in future work |
-| **Biological plausibility superficial** | Section 7: Explicit qualification of biological claims |
-| **Novelty vs. ANN sparsity** | Section 6: Explicit differentiation from ANN sparsity literature |
-| **Hypotheses vague** | Section 2: Hypotheses operationalized with specific numerical predictions |
-| **Task sequence unclear** | Section 4.3: Task-incremental, fixed ordering, explicit boundaries |
-| **Statistical testing missing** | Section 4.3 & 5: Paired t-test, F-test for non-linearity specified |
-
----
-
-**Document Status:** Ready for experimental validation.
-
-**Next Step:** Implement experiments according to methodology, collect results, and iterate based on empirical findings.
+1. McCloskey and Cohen (1989), Catastrophic interference in connectionist networks
+2. Kirkpatrick et al. (2017), Overcoming catastrophic forgetting in neural networks
+3. Lopez-Paz and Ranzato (2017), Gradient episodic memory for continual learning
+4. Zenke et al. (2017), Continual learning through synaptic intelligence
+5. Pfeiffer and Pfeil (2018), Deep learning with spiking neurons
+6. Mascoli et al. (2022), SNN continual learning, citation to be verified
+7. Olshausen and Field (1996), Emergence of simple-cell receptive field properties by learning a sparse code
+8. Buzsaki (2006), Rhythms of the brain
+9. arXiv:2507.18139, Spike sparsity in SNNs
+10. arXiv:2602.12236, SNN continual learning
