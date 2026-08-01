@@ -146,3 +146,87 @@ Benjamini-Hochberg FDR, bootstrap CIs, quadratic regression for the inverted-U
 5. Avalanche 5-minute intro
 6. CKA paper + Google Research demo
 7. StatQuest (t-tests, effect sizes, bootstrap, multiple comparisons)
+
+---
+
+## Study Roadmap: Understanding This Experiment and Its Results
+
+The five sections above are external links. This section is different: it maps the concepts you need to the two in-repo documents, then gives a realistic one-day plan.
+
+The two documents:
+- **COMPANION_GUIDE.md** — 15-chapter handbook, beginner to research-level, reads linearly.
+- **RESEARCH_REPORT.md** — 15-section deep-dive into the study design, mechanism, and analysis plan.
+
+---
+
+### Part A: Topic Roadmap
+
+These ~15 topics take you from zero to being able to understand the experimental design and interpret the pilot results. Each maps to a chapter of COMPANION_GUIDE.md and/or a section of RESEARCH_REPORT.md.
+
+#### A.1 Topics to understand the experiment (the design)
+
+| # | Topic | Where to read |
+|---|-------|---------------|
+| 1 | Neural network fundamentals — MLP, backprop, Adam, cross-entropy | COMPANION_GUIDE Ch.1 |
+| 2 | MNIST family and Split-MNIST construction | COMPANION_GUIDE Ch.2 |
+| 3 | Continual learning settings — task- / domain- / class-incremental | COMPANION_GUIDE Ch.3 + RESEARCH_REPORT §1 |
+| 4 | Catastrophic forgetting and the stability-plasticity dilemma | COMPANION_GUIDE Ch.4 |
+| 5 | Spiking neurons and the LIF model (beta = exp(-1/tau), membrane/threshold/reset dynamics) | COMPANION_GUIDE Ch.5-6 + RESEARCH_REPORT §2 |
+| 6 | Encoding and time in SNNs — rate coding, choosing the number of timesteps T | COMPANION_GUIDE Ch.7 |
+| 7 | Surrogate-gradient training — why spikes are non-differentiable and how fast-sigmoid gets around it | COMPANION_GUIDE Ch.8 |
+| 8 | Spike sparsity and the threshold mechanism — the active-neuron metric, calibration, calibration drift, and the ~38% activity ceiling of this architecture | COMPANION_GUIDE Ch.9 + RESEARCH_REPORT §6 |
+
+#### A.2 Topics to interpret the results
+
+| # | Topic | Where to read |
+|---|-------|---------------|
+| 9 | The central hypothesis and mechanism — sparsity -> less representational overlap -> less forgetting | COMPANION_GUIDE Ch.10 + RESEARCH_REPORT §§3-4 |
+| 10 | Continual-learning metrics — the accuracy matrix, forgetting score, backward transfer | COMPANION_GUIDE Ch.11 + RESEARCH_REPORT §8 |
+| 11 | Representational-overlap metrics — cosine similarity vs CKA, why centering matters (this explains the cosine ~0.95 vs CKA ~0.02 gap seen in the pilot) | COMPANION_GUIDE Ch.12 |
+| 12 | Mediation vs correlation — path a, path b, the indirect effect a*b, bootstrap CI; this is the study's actual novelty | RESEARCH_REPORT §5 + RESEARCH_IDEA_REFINED §3.5 |
+| 13 | Confound controls — capacity vs plasticity vs genuine sparse-coding, and the six controls | COMPANION_GUIDE Ch.13 + RESEARCH_REPORT §6 |
+| 14 | The inverted-U / quadratic hypothesis and the interior-peak requirement (H3) | RESEARCH_REPORT §4 |
+| 15 | Statistics for the study — seeds, effect sizes, why the pilot is screening-only and not confirmatory | COMPANION_GUIDE Ch.15 |
+
+---
+
+**Reading orders:**
+
+- **FAST path** (enough to interpret the current pilot results): topics 3 -> 4 -> 5 -> 8 -> 10 -> 11 -> 9.
+- **FULL path**: COMPANION_GUIDE Ch.1-15 in order, then RESEARCH_REPORT end to end.
+
+---
+
+**The three most load-bearing concepts for this pilot:**
+
+- **CKA and centering (Topic 11)** — explains the cosine-vs-CKA gap in the results. Cosine similarity and linear CKA are both computed as mean pairwise overlap across the five Split-MNIST task representations (hidden-layer-2 spike counts); they diverge because CKA centers the representations first.
+- **Threshold -> activity -> the ~38% ceiling (Topic 8)** — explains the whole calibration saga and why targets were redefined to ~1-35%. The architecture hits a hard ceiling before you reach the high-sparsity regime the hypothesis needs.
+- **Mediation is not correlation (Topic 12)** — the line between this being novel work and a rediscovery of existing sparse-SNN results. CKA tracking forgetting across conditions and seeds is the mechanism signal; whether that path is causal is what the mediation model tests.
+
+---
+
+### Part B: What's Achievable in a Single Day
+
+Reading everything in a day is possible. Genuinely understanding all 15 topics is not — that is roughly a two-day effort. The FAST path alone is enough to interpret the pilot results, and it fits in one focused day (~6-8 hours).
+
+**One-day plan (FAST path):**
+
+| Block | Time | Topics |
+|-------|------|--------|
+| Morning 1 | ~1.5h | Continual-learning settings (topic 3) + catastrophic forgetting (topic 4) |
+| Morning 2 | ~2h | The LIF neuron (topic 5) + spike sparsity / threshold / activity metric / ~38% ceiling (topic 8) |
+| Afternoon 1 | ~1h | CL metrics — accuracy matrix, forgetting score, backward transfer (topic 10) |
+| Afternoon 2 | ~1.5h | Overlap metrics — cosine vs CKA and centering (topic 11); this is the one that explains the cosine ~0.95 vs CKA ~0.02 result |
+| Afternoon 3 | ~1h | The central mechanism — sparsity -> less overlap -> less forgetting (topic 9) |
+
+---
+
+**Save these three for a second day (do not rush them):**
+
+- Surrogate-gradient training (topic 7)
+- Mediation vs correlation, the formal model and bootstrap CI (topic 12) — the novelty; it deserves real time
+- The full confound-control logic and the six controls (topic 13)
+
+---
+
+One focused day on the FAST path is enough to read and interpret the pilot the moment it finishes. The rigor layer — surrogate gradients, mediation statistics, confound design — is what you need before the full study and the paper. That is a second day, not today's bottleneck.
