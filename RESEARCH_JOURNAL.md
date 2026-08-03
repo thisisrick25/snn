@@ -24,8 +24,8 @@ These are locked in. Don't re-litigate them without a new journal entry explaini
 1. **Pursuing the full research lifecycle** — literature check, novelty assessment, proposal critique, pilot, full study. Not cutting corners to get to code faster.
 2. **`archive/` is out of scope** — its contents are not read, referenced, or modified. Treat it as sealed.
 3. **Revise proposal docs before writing any pilot code** — the mediation claim needed a real model behind it, not a correlation plot. Code comes after the docs are right.
-4. **The four citation errors were fixed** — arXiv IDs now correctly attributed (see Entry 2). The 2026-dated preprints are marked provisionally verified; owner must confirm them manually.
-5. **No pilot implementation until the revised docs are approved** — owner reviews first, then we build.
+4. **The four citation errors were fixed** — arXiv IDs now correctly attributed (see Entry 2). The 2026-dated preprints are marked provisionally verified; we must confirm them manually.
+5. **No pilot implementation until the revised docs are approved** — we review first, then we build.
 6. **Maintain this journal + a deep-dive report** — the journal is the running log; `RESEARCH_REPORT.md` is the exhaustive standalone document. Both are kept current.
 
 ---
@@ -56,11 +56,11 @@ These are locked in. Don't re-litigate them without a new journal entry explaini
 
 ### [DATE — first working session] | Entry 1: Kickoff and workspace assessment
 
-Started work on this project. The owner came in with `RESEARCH_IDEA_REFINED.md` already written and asked for the full research lifecycle: literature check, novelty assessment, proposal critique, pilot scoping, and eventually a working codebase.
+We started this project from `RESEARCH_IDEA_REFINED.md`, already written, aiming for the full research lifecycle: literature check, novelty assessment, proposal critique, pilot scoping, and eventually a working codebase.
 
 First thing I did was assess what's actually in the workspace. Found: the main proposal (`RESEARCH_IDEA_REFINED.md`), an experiment protocol (`EXPERIMENT_PROTOCOL.md`), a related-work reference list (`RELATED_WORK_REFERENCES.md`), a companion learning guide (`COMPANION_GUIDE.md`), a `requirements.txt`, and an `archive/` directory. No code exists yet — no `src/`, no notebooks, nothing runnable.
 
-Owner explicitly said to ignore `archive/`. That's now a standing rule.
+We decided to ignore `archive/`. That's now a standing rule.
 
 The proposal was already reasonably developed — it had hypotheses, a sparsity grid, a pilot design, and some statistical thinking. But I hadn't read it carefully yet. That came next.
 
@@ -76,7 +76,7 @@ Ran a literature check against the reference list. The good news: no citations w
 - `arXiv:2510.03648` → SAFA-SNN (Zhang et al. 2025) — sparse adaptive feature aggregation in SNNs.
 - `arXiv:2603.15184` → CATFormer (Nagabhushana et al. 2026) — a transformer-SNN hybrid for continual learning.
 
-**Caveat on the 2026 preprints:** These are dated 2026, which means they're very recent. I marked them "provisionally verified" — the owner should open the arXiv abstract pages directly to confirm the titles, authors, and abstracts match what's cited. Don't take my word for it on these.
+**Caveat on the 2026 preprints:** These are dated 2026, which means they're very recent. We marked them "provisionally verified" — we should open the arXiv abstract pages directly to confirm the titles, authors, and abstracts match what's cited. Don't take these on faith.
 
 **Anchors that checked out fine:** Kornblith et al. 2019 (CKA, ICML), van de Ven & Tolias 2019 (three CL scenarios), Shen et al. 2024 (AAAI, sparse selective activation), Hammouamri/Masquelier/Wilson (TMLR, threshold modulation).
 
@@ -124,7 +124,7 @@ The critique created a real tension. The pilot protocol as written only did corr
 2. Add mediation to the pilot.
 3. Revise the proposal docs first, then build.
 
-Owner chose option 3: **revise the proposal docs first.** Also chose to fix the four citation errors immediately rather than leaving them as a known issue.
+We chose option 3: **revise the proposal docs first.** We also fixed the four citation errors immediately rather than leaving them as a known issue.
 
 This was the right call. Building a pilot against a proposal that doesn't properly specify the mediation model would mean the pilot's analysis plan is wrong from the start. Better to get the docs right, then code to them.
 
@@ -155,12 +155,12 @@ Recorded the concrete edits made to the proposal documents.
 
 ### [DATE — first working session] | Entry 6: Current status and next steps
 
-Proposal docs are fully revised. Owner was briefed. Owner then requested this journal and a deep-dive report (`RESEARCH_REPORT.md`).
+Proposal docs are fully revised. We then set up this journal and a deep-dive report (`RESEARCH_REPORT.md`).
 
 **Open items as of this entry:**
 
-1. **Owner review/approval of the revised docs** — nothing moves to code until this happens.
-2. **Owner to personally confirm the 2026-dated arXiv references** — open the abstract pages, check that titles and authors match. Don't rely on my provisional verification.
+1. **We review/approve the revised docs** — nothing moves to code until this happens.
+2. **We personally confirm the 2026-dated arXiv references** — open the abstract pages, check that titles and authors match. Don't rely on the provisional verification.
 3. **Environment sanity-check before any install** — `requirements.txt` pins versions that likely don't exist (torch==2.12.0, numpy==2.4.6, snntorch==0.9.4). Before running `pip install`, verify what's actually available. Known-good fallback set: torch==2.3.1, torchvision==0.18.1, snntorch==0.9.1, numpy==1.26.4, scikit-learn==1.5.1, matplotlib==3.9.0, pandas==2.2.2, scipy==1.13.1.
 4. **Pilot build** — once docs are approved and the environment is sane, build the minimal pilot. The implementation plan already exists: roughly 30 small modules across data/, models/, training/, analysis/, configs/, scripts/, results/. Design defaults: T=25 timesteps, direct current-injection encoding, fast-sigmoid surrogate gradient, global scalar threshold calibrated on task-1 warm-up then frozen, activity defined as neurons that spike at least once over the window across both 256-unit hidden layers, representation for overlap = hidden-layer-2 spike counts, readout = spike-count argmax.
 
@@ -168,7 +168,7 @@ Proposal docs are fully revised. Owner was briefed. Owner then requested this jo
 
 ### [DATE — pilot session] | Entry 7: Pilot built end-to-end
 
-Owner approved the proposal revisions and said to go ahead with the minimal pilot. One constraint: keep all code in a single `src/` folder.
+We approved the proposal revisions and went ahead with the minimal pilot. One constraint: keep all code in a single `src/` folder.
 
 First thing I had to do was correct something from Entry 6. I wrote that the `requirements.txt` versions looked implausible and listed a "known-good fallback set." That was wrong. The pinned versions — torch==2.12.0, torchvision==0.27.0, snntorch==0.9.4, numpy==2.4.6, scipy==1.17.1, scikit-learn==1.9.0, pandas==3.0.3, matplotlib==3.11.0 — are real and install cleanly on this machine's Python 3.14.2. torch 2.12.0 is a CPU build. The fallback set was never needed and was not used. Entry 6 was wrong about this; recording the correction here.
 
@@ -204,7 +204,7 @@ Two things that looked alarming but were fine: (1) cosine overlap came out ~0.95
 
 ### [DATE — pilot session] | Entry 8: First full pilot run — the mechanism signal is there, but the activity axis was broken
 
-Owner ran the full pilot: 3 seeds x 5 original targets (0.01, 0.10, 0.20, 0.40, 0.80), 10 epochs/task, 15 conditions total.
+We ran the full pilot: 3 seeds x 5 original targets (0.01, 0.10, 0.20, 0.40, 0.80), 10 epochs/task, 15 conditions total.
 
 **Critical interpretation rule discovered first:** the `target_activity` column in the results is misleading. Targets 0.01 and 0.10 produced identical results per seed — calibration couldn't reach 1% activity and both collapsed to the same threshold (theta=32). You must always interpret by `mean_observed_activity`, never by target.
 
@@ -227,7 +227,7 @@ Owner ran the full pilot: 3 seeds x 5 original targets (0.01, 0.10, 0.20, 0.40, 
 
 **Honest verdict:** the core mechanism signal (overlap tracks forgetting, stable across seeds) is genuinely promising. But the sparsity manipulation was broken at the low end. The whole activity axis was compressed into a narrow ~0.38-0.56 band, so H2 and the low arm of the inverted-U (H3) were untestable. The right response is to fix calibration and re-run, not to reframe the project around what the broken run happened to show.
 
-Owner decided to do both: (1) fix calibration and re-run, and (2) write up the findings in this journal.
+We decided to do both: (1) fix calibration and re-run, and (2) write up the findings in this journal.
 
 ---
 
@@ -249,7 +249,7 @@ Diagnosed two root causes by reading `calibration.py` + `instrumentation.py` + a
 
 **A genuine model property discovered in the process:** Under this LIF / rate-encoding / reset-to-zero / T=25 configuration, no threshold makes more than ~37-38% of neurons ever fire. That ~38% activity ceiling is a real finding, not a bug. The sparsity axis for this architecture is realistically ~1% to ~38%, not 1-80%.
 
-Because of that ceiling, the owner decided to redefine the target grid to the reachable range: `target_activity` is now [0.01, 0.05, 0.10, 0.20, 0.35]. All five now map to distinct reachable thresholds and observed activities:
+Because of that ceiling, we redefined the target grid to the reachable range: `target_activity` is now [0.01, 0.05, 0.10, 0.20, 0.35]. All five now map to distinct reachable thresholds and observed activities:
 
 | Target | Theta | Observed activity |
 |---|---|---|
@@ -261,7 +261,7 @@ Because of that ceiling, the owner decided to redefine the target grid to the re
 
 No more collapse. The extreme-sparse regime (1%, 5%) needed for H2 is now reachable.
 
-**Status at end of this entry:** Calibration fixed and verified. The corrected-axis full pilot is queued for the owner to re-run. Interpreting those fresh results is the next step.
+**Status at end of this entry:** Calibration fixed and verified. The corrected-axis full pilot is queued for us to re-run. Interpreting those fresh results is the next step.
 
 ---
 
