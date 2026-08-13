@@ -8,8 +8,11 @@ __pycache__/
 .venv/
 
 # Experiment outputs
-# results/
-# data/
+# results/ kept tracked (small: pilot summary + json evidence)
+data/
+
+# Session / agent state
+.omo/
 
 # OS / editor
 .DS_Store

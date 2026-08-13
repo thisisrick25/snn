@@ -50,6 +50,18 @@ Prediction: Continual learning performance will follow an inverted-U pattern, wi
 
 Test: Fit a quadratic regression to accuracy as a function of sparsity and test for non-linearity with an F-test at p < 0.05.
 
+Interior-peak requirement: A significant quadratic term is necessary but not sufficient. The fitted vertex must lie strictly inside the tested activity range (inside (5%, 95%), ideally within 20-40%), with a bootstrap confidence interval on the peak location that excludes the range boundaries (see Section 8.3). A curve that merely flattens or bends at an extreme can also produce a significant quadratic coefficient and does not count as support for an inverted-U.
+
+Mechanism-separation requirement: The inverted-U must be established per sparsity mechanism (threshold, winner-take-all, activity regularization) before any pooled curve is reported. Mechanistically different interventions are not pooled unless their individual curves agree (see Section 4.2).
+
+### H4: Representational overlap mediates the sparsity-forgetting relationship
+
+Prediction: The effect of spike sparsity on forgetting is at least partially mediated by reduced representational overlap between tasks. That is, increasing sparsity reduces overlap (path a), and lower overlap predicts lower forgetting conditional on sparsity (path b), such that the indirect effect (a x b) is significantly different from zero.
+
+Rationale: This is the central novelty of the project. Prior SNN continual-learning work already establishes that sparse activation, threshold modulation, and spike budgeting can reduce forgetting; what remains under-characterized is *why*. Establishing overlap as a mediator (rather than merely a correlate) is what distinguishes this study from occupied territory (e.g., Shen et al. 2024). Correlation across sparsity levels is not mediation.
+
+Test: A formal mediation model estimating the indirect effect with a bootstrap confidence interval, conditional on confounds (see Section 3.5). A significant negative correlation between overlap and forgetting is a necessary precondition but is not, by itself, accepted as evidence of mediation.
+
 ## 3. Testing the proposed mechanism
 
 A lower forgetting score would not, by itself, show that sparsity caused lower interference. The study therefore measures the proposed mechanism directly instead of treating the accuracy curve as enough evidence.
@@ -62,14 +74,96 @@ A lower forgetting score would not, by itself, show that sparsity caused lower i
 
 ### 3.2 Ablation study
 
-- Post-hoc sparsity manipulation: After training on task A, increase or decrease sparsity before training on task B and then measure forgetting.
-- Control condition: Compare against networks where sparsity is not changed after task A.
-- Expected pattern: If sparsity has a causal role, changing sparsity after task A should change forgetting on task A after learning task B.
+Interference is created *while* task B is being learned, not after. The ablation therefore manipulates sparsity during task-B training rather than masking the network after task A.
 
-### 3.3 Learning-rate control
+- During-task-B manipulation: Train task A to a fixed mastery, then increase or decrease the active-unit sparsity *during* task-B training, which is when weight updates from task B can overwrite task-A structure.
+- Fixed evaluation mask: Keep the task-A evaluation mask fixed across all conditions, so that the measurement probe for task-A accuracy does not change when the training-time sparsity changes. This ensures any observed difference reflects altered interference during learning, not a different readout at test time.
+- Control condition: Compare against networks where the task-B-time sparsity is left at its default level (no manipulation), with the same fixed task-A evaluation mask.
+- Why not post-hoc masking: Masking the network after task A changes which units the readout reads from (a readout effect) without changing the interference that occurred during task-B learning. Manipulating sparsity during task B, with a fixed evaluation mask, isolates the interference mechanism the hypothesis is about.
+- Expected pattern: If sparsity has a causal role in reducing interference, increasing active-unit overlap during task-B training should increase task-A forgetting, and increasing sparsity during task-B training should reduce it, with the task-A evaluation mask held constant.
+
+### 3.3 Capacity and plasticity controls
+
+A lower forgetting score at moderate sparsity could arise for reasons unrelated to reduced interference. Two confounds must be ruled out before any causal claim:
+
+- Capacity confound: A sparser network may simply learn *less* of task A, so there is less to forget. Lower forgetting would then reflect weaker initial learning, not better retention.
+- Plasticity confound: With fewer active neurons, fewer weights are updated during task B. Lower forgetting would then reflect *fewer updates*, a trivial plasticity effect, rather than sparse coding reducing representational interference.
+
+The study controls for both as follows.
+
+#### 3.3.1 Matched task-A mastery
+
+- Requirement: Report task-A peak accuracy (immediately after training on task A, before any task-B training) at every sparsity level.
+- Analysis rule: Forgetting comparisons across sparsity levels are only valid conditional on equal task-A mastery. Where peak accuracies differ, report forgetting as a function of task-A mastery (for example, by stratifying or covarying on peak accuracy) rather than comparing raw forgetting scores at unequal starting points.
+- Expected pattern: If sparsity reduces interference, lower forgetting should persist at moderate sparsity even after task-A mastery is matched.
+
+#### 3.3.2 Forgetting in representation space
+
+Output-level accuracy conflates two distinct effects: degradation of the internal representation and reshuffling of the readout. The study measures forgetting in representation space to separate them.
+
+- Linear probe protocol: After training task A, freeze the feature extractor and train a linear probe on each task. After training task B, re-probe with the same frozen-then-probed protocol. A drop in probe accuracy indicates the *representation itself* degraded, independent of the output head.
+- Centered Kernel Alignment (CKA): Compute CKA (Kornblith et al. 2019) between task-A hidden representations measured before and after task-B training. High CKA with low output accuracy indicates "representation preserved, readout reshuffled"; low CKA indicates genuine representational forgetting.
+- Expected pattern: If sparsity reduces representational interference, moderate sparsity should show higher pre/post-B CKA and smaller probe-accuracy drops than dense baselines.
+- Three distinct quantities must be reported separately and not conflated:
+  1. Cross-task representational overlap: similarity between the representations of *different* tasks (task A vs task B), measured at a fixed layer. This is the proposed mediator (see Section 3.5). High cross-task overlap implies competing tasks share coding subspace.
+  2. Representation drift: change in task A's *own* representation before vs after task-B training (e.g., pre/post-B CKA on task-A inputs). This measures how much task A's internal code was overwritten.
+  3. Decodability: linear-probe accuracy on frozen features. This measures whether task information remains linearly recoverable regardless of drift. A representation can drift substantially yet remain decodable, or stay stable yet lose decodability; these are not interchangeable.
+
+#### 3.3.3 Count-matched dense baseline
+
+- Control: Construct a dense network in which a random subset of weights is frozen during task B, matched in count to the number of weights the sparse network leaves unupdated at each sparsity level.
+- Logic: This isolates "fewer weights updated" (a plasticity effect) from "sparse distributed coding reduces overlap" (the proposed mechanism).
+- Expected pattern: If the count-matched dense-frozen network forgets as little as the sparse network, the effect is attributable to fewer updates, not to sparse coding. If the sparse network forgets less than the count-matched dense-frozen control, this supports a genuine sparse-coding mechanism.
+- Limitation: This control matches the *quantity* of unupdated weights but not the *geometry* of which weights are updated or how large those updates are. The following controls (3.3.4-3.3.6) address geometry and update magnitude, which count-matching alone leaves open.
+
+#### 3.3.4 Update-norm-matched control
+
+- Motivation: Sparse activation reduces not only how many parameters are updated but also the *magnitude* of gradients flowing through inactive units. Lower forgetting could therefore reflect smaller/noisier weight updates rather than sparse coding reducing overlap.
+- Control: Match the total per-task update norm (sum of squared weight deltas, or per-layer update norm) between the sparse network and a dense comparison network, e.g. by scaling the dense network's learning rate or gradient norm so that its cumulative update magnitude equals the sparse network's at each sparsity level.
+- Logic: Isolates "smaller effective updates" from "sparse coding reduces overlap."
+- Instrumentation: Log per-task and per-layer gradient norms, update norms, and cross-task gradient cosine similarity for every run.
+- Expected pattern: If forgetting differences vanish once update norm is matched, the mechanism is update-magnitude driven, not overlap driven.
+
+#### 3.3.5 Activation-dropout control
+
+- Motivation: Sparsity mechanisms deactivate units. A dense network with random unit dropout can reproduce the same fraction of active units without any learned, input-dependent sparse code.
+- Control: Apply random per-unit dropout to a dense network calibrated to match the *observed* active-neuron percentage of the sparse network at each level.
+- Logic: Isolates "fewer units active" (a stochastic capacity effect) from "structured, input-dependent sparse coding."
+- Expected pattern: If activation-dropout at matched active% reproduces the forgetting reduction, the effect does not require a learned sparse code. If the sparse network still forgets less, this supports structured sparse coding.
+
+#### 3.3.6 Structured (neuron-block) freezing control
+
+- Motivation: The count-matched control (3.3.3) freezes a *random* subset of weights. Sparse coding may instead protect *contiguous, neuron-aligned* subnetworks (capacity partitioning), which random freezing does not emulate.
+- Control: Freeze structured neuron-aligned blocks (whole units / channels) during task B, matched to the effective unupdated-unit count of the sparse network.
+- Logic: Distinguishes capacity partitioning (protecting whole neurons) from distributed sparse coding (reducing overlap across shared neurons).
+- Expected pattern: Comparing random-weight freezing (3.3.3), structured-neuron freezing (3.3.6), and true sparsity separates "which units are protected" from "how the code is distributed."
+
+### 3.4 Learning-rate control
 
 - Confound check: Keep the main learning rate fixed across sparsity levels.
 - Sensitivity analysis: Repeat key experiments with learning rates of 0.001, 0.0001, and 0.00001.
+
+### 3.5 Formal mediation model
+
+Correlating sparsity, overlap, and forgetting across sparsity levels does not establish mediation. To test H4 (Section 2), the study fits a formal mediation model that estimates the indirect effect of sparsity on forgetting *through* representational overlap, conditional on confounds.
+
+Primary mediator (predefined): cross-task representational overlap between task A and task B measured at the primary layer *during task-B training*. This single quantity is the confirmatory mediator. CKA, cosine similarity, PCA overlap, and linear-probe-based measures serve as robustness/sensitivity checks, not as additional confirmatory mediators.
+
+Variables:
+- Treatment X = observed activity level (active-neuron percentage; observed, never target).
+- Mediator M = primary cross-task overlap (as above).
+- Outcome Y = forgetting (mean forgetting score F over prior tasks).
+- Covariates/controls: sparsity mechanism, task setting (task-IL vs class-IL), task-A mastery (matched peak accuracy / loss / probe accuracy), with seed as a random effect.
+
+Model:
+- Path a: regress M on X + mechanism + task setting + task-A mastery + (1 | seed).
+- Path b and direct effect: regress Y on M + X + mechanism + task setting + task-A mastery + (1 | seed). Coefficient on M = path b; coefficient on X = direct effect c'.
+- Indirect (mediated) effect = a x b, reported with a bootstrap confidence interval (resampling at the seed/run level).
+- Report: path a, path b, direct effect c', indirect effect a x b with bootstrap CI, and the proportion of the total effect that is mediated.
+
+Decision rule: H4 is supported only if the indirect effect a x b is significantly different from zero (bootstrap CI excludes zero) after conditioning on the covariates above. A significant total effect with a non-significant indirect effect indicates sparsity acts through a non-overlap pathway (e.g., reduced plasticity or capacity), which would weaken the central novelty claim.
+
+Mechanism separation: The mediation model is estimated per sparsity mechanism first. Mechanisms are pooled only if their individual a, b, and indirect effects are consistent (see Section 4.2).
 
 ## 4. Methodology
 
@@ -98,11 +192,27 @@ The three sparsity mechanisms may not be equivalent, so each will be calibrated 
 
 | Mechanism | How sparsity is controlled | Target activity levels |
 |---|---|---|
-| Spike threshold | Higher theta produces fewer spikes | 1%, 5%, 10%, 20%, 40%, 60%, 80%, 95% |
+| Spike threshold | Higher theta produces fewer spikes | 1%, 5%, 10%, 20%, 30%, 40%, 60%, 80%, 95% |
 | Winner-take-all | Only the top-k neurons fire | Matched to the same activity levels |
 | Activity regularization | A penalty discourages high activity | Regularization strength tuned to the same activity levels |
 
-Validation: Each mechanism will be tuned independently to reach the target activity levels. Results will be reported both by activity level and by sparsity mechanism, so the analysis does not treat mechanistically different interventions as identical.
+Mechanism non-equivalence (critical): The three mechanisms are distinct interventions, not interchangeable ways of reaching "the same sparsity." Matching them on a single scalar (percentage of active neurons) does not make them equivalent, because they differ in *which* neurons are silenced and *how* the surviving code is distributed:
+
+- Spike threshold raises the firing bar uniformly; whichever neurons exceed it fire, so the active set is input-driven and can be highly overlapping across inputs.
+- Winner-take-all (top-k) enforces a hard cardinality per step; exactly k neurons fire regardless of input magnitude, producing competition and often more decorrelated codes.
+- Activity regularization applies a soft penalty during training; sparsity emerges as a learned equilibrium and may concentrate in particular units.
+
+Because these produce different *kinds* of sparsity at the same active-neuron percentage, results are analyzed per mechanism first. No pooled sparsity-forgetting or sparsity-overlap curve is reported unless the individual per-mechanism curves agree in shape and direction. This requirement is stated for H3 (Section 2) and for the mediation model (Section 3.5).
+
+Per-mechanism reporting metrics: For every (mechanism, activity level, seed) condition, the following are reported separately rather than collapsed into a single activity scalar, since two mechanisms can share an active-neuron percentage yet differ on all of these:
+
+- Active-neuron percentage (the calibration target metric; observed, not target)
+- Total spike count and mean spike rate
+- Firing-rate entropy across neurons (how evenly activity is distributed vs concentrated in a few units)
+- Lifetime sparsity (per-neuron fraction of inputs on which the neuron is active)
+- Per-neuron participation / dead-neuron fraction (how many units are effectively unused)
+
+Validation: Each mechanism is tuned independently to reach the target activity levels. Results are reported both by activity level and by sparsity mechanism, so the analysis never treats mechanistically different interventions as identical.
 
 ### 4.3 Continual learning protocol
 
@@ -116,16 +226,37 @@ These benchmarks are standard in continual learning and allow comparison with pr
 
 #### Task setting
 
-- Setting: Task-incremental learning, with task labels available at inference time
-- Task order: Fixed order for reproducibility
-- Task boundaries: Explicit boundaries between tasks
+Continual-learning difficulty depends strongly on the setting. Task-incremental learning, where the task label is provided at inference time, is the easiest setting and maximally suppresses forgetting because a separate output head is selected per task. Reporting only task-incremental results risks overstating how well sparsity controls forgetting. The study therefore evaluates two settings of increasing difficulty.
+
+- Primary setting (task-incremental): Task labels available at inference time, per-task output heads. Used for mechanism analysis and as the baseline for comparison with prior work.
+- Harder setting (class-incremental): No task labels at inference time; a single classifier head grows to cover all classes seen so far, and the model must discriminate across tasks without knowing which task a sample belongs to. This is the setting where forgetting is most severe, and it provides the stronger test of whether moderate sparsity reduces forgetting.
+- Rationale: If the sparsity effect holds in the class-incremental setting, the result is far more convincing than a task-incremental-only finding. Where the two settings disagree, that difference is itself an informative result about the limits of the mechanism.
+- Task order: Fixed order for reproducibility (a seed-level order sensitivity check is included in the statistical analysis).
+- Task boundaries: Explicit boundaries between tasks.
+
+Note: Split-MNIST is run in both settings. Class-incremental Split-MNIST uses a single 10-way head; task-incremental Split-MNIST uses per-task binary heads.
 
 #### Training details
 
 - Optimizer: Adam with learning rate 0.001
 - Batch size: 128 for MNIST and 64 for CIFAR experiments
 - Epochs: 10 per MNIST task and 20 per CIFAR task
-- Statistical testing: Paired t-tests at p < 0.05 for comparisons across sparsity levels, plus F-tests for non-linearity in the sparsity-performance curve
+- Replication: Confirmatory conditions (the primary confirmatory family below) are run with 8-10 random seeds; secondary and exploratory conditions use at least 5 seeds. Seeds vary network initialization, data shuffling, and task order (for the order-sensitivity check). All reported numbers are mean +/- standard deviation across seeds; single-run point estimates are not reported. (The pilot uses 3 seeds for feasibility only and its p-values are never reported as confirmatory evidence.)
+- Grid: The sparsity sweep includes a 30% activity point (grid: 1%, 5%, 10%, 20%, 30%, 40%, 60%, 80%, 95%) to give the inverted-U fit adequate resolution near the hypothesized 20-40% optimum.
+
+#### Statistical analysis
+
+- Sample size and dispersion: N >= 5 seeds per condition; report mean +/- std for every metric.
+- Effect sizes: Report Cohen's d alongside every pairwise comparison, so the magnitude of an effect is reported, not only its significance. Forgetting-reduction claims (for example "30% reduction") are accompanied by both a p-value and an effect size with a confidence interval.
+- Significance tests: Paired t-tests (or Wilcoxon signed-rank where normality is violated) for comparisons across sparsity levels, with seeds as the unit of replication.
+- Confirmatory test hierarchy (predefined): To avoid an uncontrolled multiple-comparison surface, tests are partitioned into three predefined families, declared before analysis:
+  - Primary confirmatory family: The core hypotheses (H1, H2, H3, and the H4 mediation claim) evaluated on ONE predefined primary configuration - one dataset (Split-MNIST), one task setting (the primary/task-incremental setting), one continual-learning method (naive sequential), and one sparsity mechanism (spike threshold). This is the family that decides whether the central claims are supported. Corrected with Holm-Bonferroni.
+  - Secondary mechanism family: The same hypotheses evaluated across the other sparsity mechanisms (winner-take-all, activity regularization) to test mechanism generality. Corrected within-family (Holm-Bonferroni).
+  - Exploratory family: Everything else - additional datasets (Permuted-MNIST, CIFAR), additional CL methods (replay, EWC, SI, LwF, PackNet), the ANN comparison (RQ4), and alternative overlap metrics. Corrected with Benjamini-Hochberg FDR and reported as exploratory, not confirmatory.
+- Multiple-comparison correction: Within each family above, all p-values are corrected (Holm-Bonferroni for the primary/secondary families, Benjamini-Hochberg FDR for the exploratory family). Corrected p-values are reported and the correction family is stated explicitly for every table.
+- Observed vs target activity: All statistical models and plots use the OBSERVED active-neuron percentage per condition, never the calibration target.
+- Effect sizes: Report Cohen's d with a confidence interval alongside every pairwise comparison, in every family.
+- Non-linearity (H3): Quadratic regression with an F-test for the quadratic term (see Section 8.3 for the interior-peak requirement), estimated per mechanism before any pooled fit (Section 4.2).
 
 ### 4.4 Continual learning methods
 
@@ -164,6 +295,8 @@ Gradient projection and parameter isolation methods can be included in the exten
 1. Cosine similarity between task-specific hidden representations.
 2. PCA overlap between task representation subspaces.
 3. Synaptic overlap, measured as correlation in weight updates between tasks.
+4. Centered Kernel Alignment (CKA) between task-A representations before and after task-B training, separating representation preservation from readout change.
+5. Linear-probe accuracy on frozen features per task, measured before and after task-B training, to quantify representation-space forgetting independent of the output head.
 
 ## 6. Related work foundation
 
@@ -173,6 +306,7 @@ Gradient projection and parameter isolation methods can be included in the exten
 - Lopez-Paz and Ranzato (2017): Gradient episodic memory for continual learning
 - Zenke et al. (2017): Synaptic Intelligence
 - Pfeiffer and Pfeil (2018): Review of deep learning with spiking neurons
+- Kornblith et al. (2019): Similarity of neural network representations revisited (CKA), used here to measure representation-space forgetting
 - Mascoli et al. (2022): Recent work on SNN continual learning, citation to be verified
 
 ### Difference from ANN sparsity work
@@ -199,6 +333,9 @@ Prediction: Activity levels of 20-40% reduce forgetting by at least 30% compared
 Evidence needed:
 
 - Forgetting score at 20-40% activity is less than 0.7 x the forgetting score at 100% activity, with p < 0.05
+- The forgetting reduction persists after matching task-A peak accuracy across sparsity levels (Section 3.3.1), ruling out the capacity confound
+- The sparse network forgets less than a count-matched dense-frozen control (Section 3.3.3), ruling out the plasticity confound
+- Representation-space evidence: higher pre/post-B CKA and smaller linear-probe accuracy drops at 20-40% activity than at dense baselines (Section 3.3.2)
 - Cosine similarity between task representations decreases as sparsity increases
 
 ### 8.2 H2: Extreme sparsity
@@ -215,15 +352,16 @@ Prediction: Performance follows an inverted-U curve, with the best range near 20
 
 Evidence needed:
 
-- Quadratic regression shows significant non-linearity, with p < 0.05
-- The estimated peak lies within the 20-40% activity range
+- Quadratic regression shows a significant negative quadratic term, with p < 0.05 after multiple-comparison correction
+- Interior-peak requirement: The estimated peak (vertex of the fitted curve) lies strictly in the interior of the tested range, inside (5%, 95%) activity, and ideally within the predicted 20-40% band. A significant quadratic term whose vertex falls at or outside the range boundary does not count as support for an inverted-U, because a curve that merely flattens or bends at an extreme can also yield a significant quadratic coefficient.
+- The peak location is reported with a confidence interval (for example via bootstrap over seeds), not as a point estimate.
 
 ## 9. Limitations and future work
 
 ### 9.1 Current limitations
 
 1. Simplified neuron model: LIF lacks adaptive thresholds and refractory-period dynamics. Later work should test adaptive LIF or Izhikevich models.
-2. Benchmark scope: Split-MNIST and Permuted-MNIST are useful first benchmarks but relatively simple. Later work should test CIFAR-10, CIFAR-100, and more realistic datasets.
+2. Benchmark scope: Split-MNIST and Permuted-MNIST are useful first benchmarks but relatively simple. Later work should test CIFAR-10, CIFAR-100, and more realistic datasets. (Difficulty of the continual-learning *setting* is addressed within this study by evaluating both task-incremental and the harder class-incremental setting, per Section 4.3; the remaining limitation is dataset complexity, not setting difficulty.)
 3. Sparsity mechanisms: Threshold tuning, winner-take-all selection, and activity regularization may produce different representational effects even at matched activity levels.
 4. Biological simplification: The sparsity controls are computational approximations and do not model the full biological basis of sparse coding.
 
@@ -241,8 +379,9 @@ Evidence needed:
 3. Lopez-Paz and Ranzato (2017), Gradient episodic memory for continual learning
 4. Zenke et al. (2017), Continual learning through synaptic intelligence
 5. Pfeiffer and Pfeil (2018), Deep learning with spiking neurons
-6. Mascoli et al. (2022), SNN continual learning, citation to be verified
-7. Olshausen and Field (1996), Emergence of simple-cell receptive field properties by learning a sparse code
-8. Buzsaki (2006), Rhythms of the brain
-9. arXiv:2507.18139, Spike sparsity in SNNs
-10. arXiv:2602.12236, SNN continual learning
+6. Kornblith, Norouzi, Lee, and Hinton (2019), Similarity of neural network representations revisited, ICML
+7. Mascoli et al. (2022), SNN continual learning, citation to be verified
+8. Olshausen and Field (1996), Emergence of simple-cell receptive field properties by learning a sparse code
+9. Buzsaki (2006), Rhythms of the brain
+10. arXiv:2507.18139, Spike sparsity in SNNs
+11. arXiv:2602.12236, SNN continual learning

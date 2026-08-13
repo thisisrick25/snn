@@ -2,7 +2,7 @@
 
 **Author:** Graduate Research Project  
 **Date:** July 2026  
-**Status:** Pre-pilot — design complete, experiments pending  
+**Status:** Pilot complete — screening results reported in Section 11; full study pending  
 **Software stack:** Python 3.x, PyTorch 2.12.0, torchvision 0.27.0, snntorch 0.9.4, numpy 2.4.6, scikit-learn 1.9.0, matplotlib 3.11.0, pandas 3.0.3, scipy 1.17.1
 
 ---
@@ -592,9 +592,143 @@ The full study runs the formal mediation model (Section 5.3) across mechanisms w
 
 ---
 
-## 11. Claim Boundaries
+## 11. Pilot Findings
 
-### 11.1 What This Project Does Not Claim
+### 11.1 Overview and Scope
+
+The pilot experiment was a minimal screening run whose sole purpose was to test the correlation precondition for the mediation hypothesis: does representational overlap between task representations track catastrophic forgetting as spike activity varies? It was not designed to run the formal mediation model, to confirm any hypothesis, or to characterize the full sparsity-forgetting relationship. The design was Split-MNIST, task-incremental setting, LIF-SNN, naive sequential training, threshold-based sparsity control, and 3 random seeds — the minimum configuration described in Section 10.2.
+
+The two-stage logic is worth restating precisely. The mediation hypothesis (H4) requires, as a necessary precondition, that representational overlap and forgetting co-vary with spike activity in the expected direction. If that correlation is absent at pilot scale, the full mediation model is not worth running. The pilot screens this precondition; the full study will run the formal mediation model with the complete seed count, multiple sparsity mechanisms, and the statistical machinery described in Sections 5 and 9. Nothing in this section constitutes confirmatory evidence.
+
+### 11.2 A Methodological Finding: Calibration Drift and the Corrected Design
+
+The original calibration procedure, described in Section 7.2, trained the network on a short warmup pass over Task 0, swept threshold values to find the one producing the target active-neuron percentage, and then froze that threshold for the remainder of the continual learning run. This procedure failed in a systematic and instructive way.
+
+The problem is that a threshold calibrated on an underfit network is not meaningful once the network is trained. During the warmup pass, weights are near their random initialization and the network has not yet learned to represent the input distribution. Membrane potentials are correspondingly modest, and a relatively low threshold is needed to produce any given activity level. As training proceeds and weights grow, more neurons cross the same frozen threshold on each forward pass. The result is substantial activity drift: a threshold calibrated to produce approximately 7% active neurons during the warmup pass produced approximately 42–64% active neurons during the actual continual learning run, once the network had trained for several epochs. The calibration target and the observed activity diverged by a factor of six to nine.
+
+This is not a numerical accident but a structural consequence of the calibration design. With a frozen global threshold, spike activity is not a directly controllable variable. It is an emergent property of the trained weights interacting with a fixed threshold. Calibrating on an underfit network and then freezing the threshold produces a threshold that is systematically too low for the trained network.
+
+The corrected design abandons the calibration-target framing entirely. Rather than asking "what threshold produces X% activity?" and then freezing that threshold, the corrected design treats the threshold as the intervention and activity as the measured outcome. The experiment sets the LIF threshold to a fixed value $\theta$ drawn from a predetermined sweep, trains the network, and records the activity level that emerges. This is more honest about what is actually being controlled: the intervention is "we set the threshold to $\theta$"; the response is "the network exhibited $X$% activity during continual learning." The analysis then uses the observed activity, as Section 9.6 requires, rather than the nominal target.
+
+This reframing has a practical consequence for the statistical plan. The sparsity axis in the corrected design is defined by the threshold sweep, not by a target activity grid. The observed activity values at each threshold are the independent variable in all downstream analyses.
+
+That said, the fixed-threshold sweep itself turned out not to be the final design. As documented in §11.8, a subsequent 27-condition sweep across nine threshold values revealed that a single frozen global threshold cannot control spike activity in a trained network: observed activity clustered in a bimodal band regardless of the threshold value, with no stable moderate-activity regime. The corrected design described here was a necessary intermediate step — it removed the calibration-drift problem and made the intervention well-defined — but it exposed a deeper limitation of threshold-based sparsity control. The sparsity mechanism was subsequently replaced by k-winner-take-all (k-WTA), which directly sets the over-window active fraction as a dial rather than relying on a threshold to produce a target activity level.
+
+### 11.3 A Model-Property Finding: The ~38% Activity Ceiling
+
+Under the specific configuration used in this project — LIF neurons with reset-to-zero, $\tau_{mem} = 20$ ms ($\beta \approx 0.951$), $T = 25$ timesteps, and direct current-injection encoding that repeats the normalized pixel value as a constant input at every timestep — no threshold, however low, drives more than approximately 37–38% of hidden neurons to fire over the simulation window. The reachable sparsity axis is therefore roughly 1–38% active neurons, not the 1–80% range originally planned.
+
+The empirically measured threshold-to-activity map on a trained network is as follows:
+
+| Threshold $\theta$ | Observed active-neuron % |
+|---|---|
+| 1.5 | ~35% |
+| 3.0 | ~30% |
+| 5.0 | ~23% |
+| 8.0 | ~17% |
+| 16 | ~14% |
+| 24 | ~11% |
+| 32 | ~8% |
+| 48 | ~3.4% |
+| 64 | ~0.9% (near-dead) |
+
+The ceiling near 38% is a property of the encoding and neuron configuration, not a failure of the threshold sweep. With direct encoding, each pixel value is injected as a constant current for all 25 timesteps. A neuron that receives sufficient current will fire on the first timestep and then reset; whether it fires again depends on whether the residual membrane potential, after the reset, accumulates enough from the continued input to cross the threshold again within the remaining timesteps. For most neurons receiving moderate input, the answer is no: the reset-to-zero rule clears the membrane, and the remaining timesteps are insufficient to recharge past the threshold. The result is that the maximum achievable activity is bounded well below 100%, and that bound sits near 38% for this particular combination of $\beta$, $T$, and encoding scheme.
+
+This ceiling should be revisited if the full study requires a denser activity regime. Increasing the number of timesteps, switching to rate coding, or using a different reset rule (reset-by-subtraction rather than reset-to-zero) would each raise the ceiling. For the present study, the reachable axis of approximately 1–38% is the operative range, and the activity grid and hypotheses should be interpreted accordingly.
+
+### 11.4 The Dead-Network Cliff
+
+At the highest tested threshold ($\theta = 64$), the network fired essentially zero spikes across all three seeds. Training loss remained frozen at $\ln(2) \approx 0.693$ — the value expected when the network outputs uniform logits and learns nothing — and final accuracy sat at approximately 51.6%, consistent with chance performance on binary classification tasks. The network was, in effect, dead: no gradient flowed through the spike function because no spikes were produced, and the surrogate gradient was zero everywhere.
+
+This is a degenerate boundary condition, not a graded decline. The transition from near-zero activity to zero activity is a cliff rather than a slope: at $\theta = 48$ the network still fires at approximately 3.4% and learns, while at $\theta = 64$ it fires at approximately 0.9% and fails to learn at all. The cliff is consistent with the spirit of H2 — extreme sparsity harms accuracy — but it does not characterize the *shape* of the accuracy decline in the extreme-sparse regime, because the network collapses to chance rather than degrading gracefully. Conditions meeting the dead-network criterion (training loss $\geq 0.68$ after the first task, or final accuracy $\leq 55\%$ on binary tasks) are now automatically flagged and excluded from mechanism analysis. The shape of the accuracy-versus-sparsity relationship in the extreme-sparse regime below approximately 3% activity therefore remains uncharacterized and is deferred to future work.
+
+### 11.5 The Mechanism Signal: Representational Overlap Tracks Forgetting
+
+The central positive result of the pilot is that linear CKA between task representations tracked catastrophic forgetting monotonically and reproducibly across all three seeds. Conditions with the lowest CKA values (approximately 0.006–0.007) had the lowest forgetting, and conditions with the highest CKA values (approximately 0.013–0.015) had the worst forgetting, with mean forgetting ranging from approximately 0.03 at the sparse end to approximately 0.44 at the dense end of the reachable activity axis. This monotonic relationship held across seeds without exception.
+
+This is the correlation precondition the mediation hypothesis requires. The pilot was designed to test whether this precondition holds, and it does. The result survived even on a compressed and imperfect activity axis — the calibration drift described in Section 11.2 meant that the first screening runs covered a narrower observed-activity range (approximately 0.38–0.56) than intended, and the relationship was still visible.
+
+Two clarifications are essential. First, this is a correlation result at pilot scale, not a mediation claim. Demonstrating that CKA and forgetting co-vary does not establish that overlap is the pathway through which sparsity affects forgetting. That requires the formal mediation model, with the indirect effect estimated conditional on confounds, which is the work of the full study. Second, the pilot used 3 seeds and a single sparsity mechanism; the result is reproducible within this narrow scope but cannot be generalized beyond it.
+
+A secondary observation concerns the contrast between cosine similarity and CKA as overlap metrics. Cosine similarity between raw task-mean representations remained high throughout — approximately 0.97–0.99 — while centered CKA was near zero. This is expected and not a contradiction. Cosine similarity on raw mean vectors measures the alignment of the average activation patterns, which tends to be high whenever both tasks activate a broadly similar set of neurons (as is the case for related digit-classification tasks sharing the same input space). CKA on centered activation matrices measures the similarity of the *relational structure* of the representations — how examples within each task relate to one another — which is a more sensitive and appropriate measure of representational overlap for the mediation hypothesis. CKA is the correct mediator metric, and the near-zero CKA values at low activity indicate that the task representations are structurally distinct even when their mean vectors point in similar directions.
+
+### 11.6 What the Pilot Did Not Establish
+
+Several questions the full study must answer remain open after the pilot.
+
+The inverted-U relationship predicted by H3 could not be characterized from the initial screening runs. The observed-activity axis in those runs was compressed (approximately 0.38–0.56) due to calibration drift, and the relationship between the nominal threshold target and the observed activity was non-monotonic. The corrected fixed-threshold sweep was intended to produce a clean, monotonic activity axis, but it did not: as documented in §11.8, the sweep revealed that a frozen global threshold cannot control activity in a trained network, and no stable moderate-activity regime emerged. The sparsity mechanism was therefore replaced by k-WTA, which did produce a controlled, monotonic activity axis spanning approximately 1–33%. On that controlled axis, the inverted-U predicted by H3 was not observed: accuracy increased roughly monotonically with activity and forgetting decreased monotonically, with no interior optimum. The H3 characterization is thus complete for this configuration, and the result is a negative one — the inverted-U did not materialize on Split-MNIST with this LIF setup.
+
+The shape of the accuracy decline in the extreme-sparse regime is uncharacterized. The dead-network cliff at $\theta = 64$ establishes that the network collapses to chance at near-zero activity, but it does not describe how accuracy degrades between approximately 3% and 0% activity. Whether the decline is gradual or abrupt, and whether it is consistent across seeds, requires additional threshold values in that range.
+
+None of the pilot results are confirmatory. Three seeds are insufficient for confirmatory inference, and the pilot was explicitly designed as a screening exercise. The p-values from pilot-scale analyses are not reported here, consistent with the policy stated in Section 9.2.
+
+### 11.7 Net Verdict: Proceed to the Full Study
+
+The pilot produced three findings that together justify proceeding to the full study. The calibration machinery has been simplified: activity is now a measured outcome of a fixed-threshold sweep rather than a calibration target, which removes the drift problem and makes the intervention well-defined. The reachable activity axis has been characterized: approximately 1–38% under the current configuration, with a dead-network cliff below approximately 1%. And the mechanism signal — the thing the novelty of this project rests on — is real and reproducible across all three seeds: representational overlap measured by linear CKA tracks catastrophic forgetting monotonically in the expected direction.
+
+The remaining work is to establish a controlled activity axis, characterize the sparsity-forgetting and sparsity-overlap relationships with adequate resolution, and then run the formal mediation model with the full seed count. §11.8 documents the two subsequent steps that completed the activity-axis problem: the fixed-threshold sweep that exposed the limits of threshold-based control, and the k-WTA run that finally produced the controlled axis the downstream analysis requires.
+
+### 11.8 Fixed-Threshold Failure and the k-WTA Result
+
+#### 11.8.1 The Fixed-Threshold Sweep: A Negative Methodological Result
+
+The corrected design described in §11.2 — treating the threshold as the intervention and activity as the measured outcome — was implemented as a 27-condition sweep: 3 seeds crossed with 9 fixed thresholds ($\theta \in \{1.5, 3, 5, 8, 16, 24, 32, 48, 64\}$), 10 epochs per task. The sweep was designed to produce a clean, monotonic activity axis spanning the full reachable range from near-zero to approximately 38%.
+
+It did not. Observed over-window active fraction clustered bimodally around 0.33–0.58 across the middle of the threshold range and was non-monotonic in $\theta$: $\theta = 1.5$ produced approximately 35% activity, $\theta = 16$ produced approximately 57%, and $\theta = 48$ produced approximately 38%. No threshold value yielded a stable moderate-activity regime in the 5–30% range. At $\theta = 64$, all three seeds collapsed to a dead network: essentially zero spikes, training loss frozen at $\ln 2 \approx 0.693$, and final accuracy at approximately 51.6% — chance performance on binary classification tasks, consistent with the dead-network cliff described in §11.4.
+
+This is not a tuning artifact. Because calibration had already been removed, the behavior reflects a fundamental property of the trained network: as weights grow during training, activity re-saturates into the 33–58% band regardless of the frozen threshold. The threshold controls the dead/alive boundary — whether the network fires at all — but not the activity level within the alive regime. A single frozen global threshold cannot serve as a sparsity dial for a trained SNN.
+
+The old threshold mechanism is retained in the codebase as a config-selectable fallback, so the negative result remains reproducible.
+
+#### 11.8.2 The k-WTA Switch
+
+Sparsity control was moved to a k-winner-take-all mechanism. For each input sample and each hidden layer, a fixed winner set of $k$ neurons is selected once per forward pass, scored by summed membrane potential over the full $T = 25$ timestep window, and held for the entire window: non-winners have both their spikes and membrane potential multiplied by a detached 0/1 mask at every timestep. This is a per-sample, per-layer, whole-window winner set.
+
+The distinction from per-timestep top-$k$ selection is important. Per-timestep selection would allow different neurons to win on different timesteps; the union of winners over the window would cover most of the layer, defeating the over-window activity metric. The whole-window winner set upper-bounds the over-window active fraction per layer at $k / \text{width}$, making activity a directly-set dial. Gradients still flow through kept neurons via the surrogate gradient mechanism; the mask is detached, so it does not block the backward pass through the winning neurons.
+
+#### 11.8.3 The Controlled-Axis Result
+
+The k-WTA sweep ran 18 conditions: 3 seeds crossed with 6 target fractions ($f \in \{0.01, 0.05, 0.10, 0.20, 0.30, 0.40\}$), 10 epochs per task. Measured mean observed activity tracked the target fraction almost exactly and monotonically across all three seeds:
+
+| Target fraction | Observed activity |
+|---|---|
+| 0.01 | 0.012 |
+| 0.05 | 0.050 |
+| 0.10 | 0.101 |
+| 0.20 | 0.198 |
+| 0.30 | 0.280 |
+| 0.40 | 0.327 |
+
+The top fraction lands near 0.33 rather than 0.40 because k-WTA upper-bounds which neurons *may* fire; not all winners cross the firing threshold within the window. The resulting axis spans approximately 1–33%, clean and monotonic. No conditions were flagged dead.
+
+Seed-averaged outcomes across the six target fractions are as follows:
+
+| Target fraction | Final accuracy | Mean forgetting | CKA |
+|---|---|---|---|
+| 0.01 | 0.771 | 0.270 | 0.0132 |
+| 0.05 | 0.828 | 0.199 | 0.0163 |
+| 0.10 | 0.778 | 0.262 | 0.0136 |
+| 0.20 | 0.815 | 0.220 | 0.0107 |
+| 0.30 | 0.839 | 0.193 | 0.0093 |
+| 0.40 | 0.877 | 0.147 | 0.0091 |
+
+Cosine similarity between task-mean representations remained high throughout (approximately 0.73–0.99), consistent with the earlier finding that cosine similarity on raw mean vectors is insensitive to the representational structure the mediation hypothesis cares about. CKA is the meaningful overlap metric.
+
+#### 11.8.4 Scientific Findings on the Controlled Axis
+
+**H3 (inverted-U, moderate-sparsity optimum) is not supported.** Accuracy increases roughly monotonically with activity across the 1–33% range, and forgetting decreases roughly monotonically. There is no interior optimum. On Split-MNIST with this LIF configuration, denser activity is simply better within the tested range. This is a substantive negative result against the proposal's central framing — the "moderate sparsity near 20–40% is the sweet spot" prediction does not hold here.
+
+**H2 (extreme sparsity harms accuracy) is weakly supported, as a soft gradient rather than a cliff.** Accuracy declines gently toward the sparse end (approximately 0.88 at 33% activity down to approximately 0.77 at 1%), and the network still learns at 1% activity. This is qualitatively different from the dead-network collapse seen in the fixed-threshold regime: the k-WTA mechanism prevents the hard cliff by construction, so the extreme-sparse regime is now characterized as a gradual accuracy penalty rather than a degenerate boundary condition.
+
+**The mechanism signal — representational overlap tracking forgetting — is present and in the hypothesized direction.** CKA falls from approximately 0.016 at the sparse end to approximately 0.009 at the dense end, while forgetting also falls over the same range. Lower overlap co-occurs with less forgetting, consistent with the mediation hypothesis. However, this is activity-confounded: overlap and forgetting both co-vary with activity across the sweep, so this screening run cannot separate genuine mediation from mere co-variation with the common cause. Disentangling them is the job of the full study's formal mediation model, which estimates the indirect effect of sparsity on forgetting through overlap conditional on the direct effect.
+
+**Net assessment.** The k-WTA switch is an engineering success: it delivers the controlled activity axis that is the prerequisite for everything downstream. The scientific picture is mixed and informative. The inverted-U did not materialize on Split-MNIST, which challenges the proposal's central framing and raises the value of two things: the formal mediation analysis (which can still support H4 even without an interior optimum, provided the indirect effect is nonzero) and possibly a harder benchmark such as Split-CIFAR, where representational interference may be severe enough that an interior optimum emerges. The negative H3 result sharpens the project rather than ending it; the novelty now leans more heavily on the mediation story than on the performance-optimum story.
+
+---
+
+## 12. Claim Boundaries
+
+### 12.1 What This Project Does Not Claim
 
 Several claims are tempting but not supported by the design, and stating them would misrepresent the contribution.
 
@@ -606,11 +740,11 @@ Several claims are tempting but not supported by the design, and stating them wo
 
 **"Spike-count energy proxies prove hardware energy efficiency."** The energy proxy (spike count $\times$ synaptic operations) is a computational estimate that correlates with energy use on neuromorphic hardware under idealized assumptions. Real hardware energy depends on memory access patterns, data movement, chip architecture, and operating conditions. The proxy is useful for within-study comparisons but cannot be used to claim hardware energy efficiency without validation on actual neuromorphic hardware (Intel Loihi, IBM TrueNorth, or similar).
 
-### 11.2 Biological Interpretation
+### 12.2 Biological Interpretation
 
 Biological sparsity is used as motivation for the hypothesis, not as evidence of biological fidelity. The mechanisms that produce sparse activity in biological neural systems — inhibitory circuits, homeostatic plasticity, metabolic constraints — are complex and not modeled here. Threshold tuning, winner-take-all rules, and activity penalties are simplified computational controls. The paper should treat biological sparsity (Olshausen and Field, 1996; Buzsaki, 2006) as motivation for asking whether sparse activity reduces interference, not as evidence that the SNN model captures the relevant biology.
 
-### 11.3 Acceptable Claims at Each Stage
+### 12.3 Acceptable Claims at Each Stage
 
 **Acceptable pilot-stage claim** (if the correlation precondition holds):
 > In a controlled Split-MNIST LIF-SNN setting, moderate spike sparsity is associated with lower representational overlap and lower forgetting.
@@ -625,9 +759,9 @@ The third claim is a negative result for the mediation hypothesis but a positive
 
 ---
 
-## 12. Limitations and Future Work
+## 13. Limitations and Future Work
 
-### 12.1 Current Limitations
+### 13.1 Current Limitations
 
 **Simplified neuron model.** The LIF model lacks adaptive thresholds, refractory-period dynamics, and dendritic computation. Biological neurons show spike-frequency adaptation (firing rate decreases with sustained input), subthreshold resonance, and complex dendritic integration. These phenomena may be relevant to how biological sparsity interacts with memory consolidation. Later work should test adaptive LIF or Izhikevich models to determine whether the findings hold with richer neuron dynamics.
 
@@ -639,7 +773,7 @@ The third claim is a negative result for the mediation hypothesis but a positive
 
 **Energy proxy limitations.** The spike-count energy proxy is a computational estimate that does not account for memory access, data movement, or chip-specific characteristics. Hardware validation is required before any energy efficiency claim can be made.
 
-### 12.2 Future Directions
+### 13.2 Future Directions
 
 **Adaptive sparsity.** Allow sparsity to change during training based on task difficulty or task identity. A network that automatically adjusts its sparsity level to minimize interference — without explicit task labels — would be a more powerful and more biologically plausible system.
 
@@ -656,15 +790,15 @@ The third claim is a negative result for the mediation hypothesis but a positive
 
 ---
 
-## 13. Related Work in Context
+## 14. Related Work in Context
 
-### 13.1 Foundational Continual Learning
+### 14.1 Foundational Continual Learning
 
 McCloskey and Cohen (1989) documented catastrophic interference in connectionist networks, establishing the problem that this project addresses. Kirkpatrick et al. (2017) introduced Elastic Weight Consolidation (EWC), which adds a quadratic penalty $\frac{\lambda}{2} \sum_i F_i (\theta_i - \theta_{1,i})^2$ to protect parameters important for earlier tasks, where $F_i$ is the diagonal Fisher information. Zenke, Poole, and Ganguli (2017) introduced Synaptic Intelligence (SI), which accumulates an online estimate of each parameter's importance during training. Lopez-Paz and Ranzato (2017) introduced Gradient Episodic Memory (GEM), which constrains gradient updates to not increase loss on stored examples from earlier tasks. Li and Hoiem (2017) introduced Learning without Forgetting (LwF), which uses the old model's predictions as soft targets when training on new tasks. Mallya and Lazebnik (2018) introduced PackNet, which prunes and freezes parameters after each task, allocating different subsets to different tasks.
 
 Van de Ven and Tolias (2019) provided the three-scenario taxonomy (task-IL, domain-IL, class-IL) that is now the standard framing for continual learning research and that this project adopts throughout.
 
-### 13.2 SNN Continual Learning with Sparsity
+### 14.2 SNN Continual Learning with Sparsity
 
 Shen, Ni, Xu, and Tang (2024, AAAI) is the closest prior work. They used trace-based K-Winner-Take-All and variable thresholds to create sparse selective activation for continual learning in SNNs, demonstrating that sparse activation can reduce forgetting. This paper occupies the "sparse activation reduces forgetting in SNNs" space and is the primary comparison point for novelty assessment.
 
@@ -674,25 +808,25 @@ Meem, Nadid, and Mia (2026, arXiv:2602.12236) combined replay, learnable LIF neu
 
 Additional recent work includes: active dendrites for efficient continual learning in time-to-first-spike SNNs (arXiv:2404.19419); TACOS, a task-agnostic SNN continual learning method using synaptic consolidation and neuromodulation (arXiv:2409.00021); gradient-free continual learning via inter-spike interval regularization (Roy et al., 2026, arXiv:2604.16496); SAFA-SNN for few-shot class-incremental learning (Zhang et al., 2025, arXiv:2510.03648); and CATFormer, combining continual learning with spiking transformers using dynamic-threshold LIF neurons (Nagabhushana et al., 2026, arXiv:2603.15184).
 
-### 13.3 Representational Overlap and Forgetting
+### 14.3 Representational Overlap and Forgetting
 
 Ramasesh, Dyer, and Raghu (2020, ICLR) studied forgetting through hidden representations and task semantics, establishing the ANN-side link between representational overlap and forgetting. Doan et al. (2021) provided a theoretical analysis of catastrophic forgetting through the NTK overlap matrix, treating task overlap as central to forgetting. Abbasi et al. (2022) used k-winner sparse activations and heterogeneous dropout to reduce overlap between task representations in ANNs. Hu et al. (2024, ICML) used orthogonal sparse network partitioning to reduce interference and share useful knowledge.
 
 Kornblith, Norouzi, Lee, and Hinton (2019, ICML) introduced CKA as a principled representation similarity measure, which this project uses as both a cross-task overlap metric and a representation drift metric.
 
-### 13.4 Spike Sparsity and Energy Efficiency
+### 14.4 Spike Sparsity and Energy Efficiency
 
 Yan, Bai, and Wong (2024, arXiv:2409.08290) caution that SNN energy efficiency depends on time window, sparsity, memory access, and data movement — an important reference for avoiding simplistic energy claims. High-performance deep SNNs with 0.3 spikes per neuron (Nature Communications, 2024) demonstrate that high-performance SNNs can operate with very sparse spiking. Wei et al. (2025, arXiv:2505.10909) exploit hierarchical sparsity in SNN activations for hardware efficiency.
 
-### 13.5 Biological Sparse Coding
+### 14.5 Biological Sparse Coding
 
 Olshausen and Field (1996, Nature) showed that learning a sparse code for natural images produces basis functions resembling simple-cell receptive fields, providing the foundational biological motivation for sparse coding. Buzsaki (2006, Rhythms of the Brain) provides broad neuroscience background on neural rhythms and temporal neural activity. Lennie (2003, Current Biology) provides the classic biological energy-constraint reference, estimating that fewer than 1–4% of cortical neurons are active simultaneously.
 
 ---
 
-## 14. Software and Reproducibility
+## 15. Software and Reproducibility
 
-### 14.1 Software Stack
+### 15.1 Software Stack
 
 The project uses the following software stack (from requirements.txt):
 
@@ -704,7 +838,7 @@ The project uses the following software stack (from requirements.txt):
 - **pandas 3.0.3**: data management and tabular analysis
 - **scipy 1.17.1**: statistical tests (t-tests, Wilcoxon, quadratic regression F-tests)
 
-### 14.2 Reproducibility Requirements
+### 15.2 Reproducibility Requirements
 
 All experiments are run with fixed random seeds that vary network initialization, data shuffling, and task order. Seeds are reported for every condition. The accuracy matrix $A \in \mathbb{R}^{T \times T}$ is saved after each task for every seed and condition. Hidden representations are saved for overlap analysis. Sparsity calibration tables (target activity, observed activity, threshold value) are reported for every condition.
 
@@ -712,7 +846,7 @@ The analysis uses observed active-neuron percentage throughout, never the calibr
 
 ---
 
-## 15. Summary of Design Decisions and Their Rationale
+## 16. Summary of Design Decisions and Their Rationale
 
 This section collects the key design decisions made in this project and the reasoning behind each, as an audit trail for future reference.
 

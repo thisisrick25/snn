@@ -1,0 +1,64 @@
+# Pilot experiment configuration.
+# Single source of truth for the minimal Split-MNIST LIF-SNN threshold-sparsity pilot.
+# See EXPERIMENT_PROTOCOL.md sections 2 and 10 for the authoritative scope.
+
+# --- Reproducibility ---
+seeds: [0, 1, 2]            # 3 seeds; pilot is feasibility-only (p-values not confirmatory)
+
+# --- Dataset (Split-MNIST, task-incremental) ---
+data_root: "./data"        # torchvision downloads MNIST here on first run
+tasks:                     # 5 binary tasks, fixed order; labels remapped to {0, 1} per task
+  - [0, 1]
+  - [2, 3]
+  - [4, 5]
+  - [6, 7]
+  - [8, 9]
+batch_size: 128
+
+# --- Model (LIF-SNN) ---
+input_dim: 784             # flattened 28x28 MNIST
+hidden_dims: [256, 256]    # two hidden LIF layers
+n_classes_per_task: 2      # binary heads
+timesteps: 25              # T; simulation window
+tau_mem: 20.0              # ms; beta = exp(-1/tau_mem) ~= 0.9512 with dt = 1 ms
+beta: 0.951229             # exp(-1/20); precomputed for clarity
+v_reset: 0.0               # reset-to-zero after spike
+
+# --- Training (naive sequential) ---
+lr: 0.001                  # Adam
+epochs_per_task: 10
+
+# --- Resource limits ---
+# Cap the number of CPU threads PyTorch uses for its matmuls. The CPU-only torch
+# build otherwise grabs every core and can make the desktop unresponsive during a
+# run. 0 = let torch decide (all cores); a small positive number (e.g. 2-4) keeps
+# the machine usable at the cost of a slower run. Overridable with --threads.
+num_threads: 2
+
+# Compute device. auto = use CUDA GPU if available, else fall back to CPU.
+# Force with "cpu" or "cuda". Overridable with --device. The CPU thread cap above
+# only matters on the CPU path. Requires a CUDA-enabled torch build for "cuda".
+device: auto
+
+# --- Sparsity mechanism ---
+# "kwta_window": winner-take-all. A fixed per-sample, per-layer set of k winners
+#   (chosen by summed membrane over the T-window) is allowed to fire; the over-
+#   window active fraction per layer is bounded by k/width, giving a CONTROLLED
+#   sparsity axis. The swept condition is `kwta_fractions` (target active fraction).
+# "threshold": legacy global firing threshold. Kept as a fallback, but a frozen
+#   threshold does NOT control activity in a trained SNN (weights grow until
+#   activity re-saturates), so it is not used for the sparsity study. The swept
+#   condition is `thresholds`.
+sparsity_mode: kwta_window
+
+# Target active-neuron fractions swept in kwta_window mode. k per layer =
+# round(fraction * hidden_width). Measured activity is <= the target (selected
+# winners may not all cross threshold), so ALWAYS analyse by the measured
+# mean_observed_activity; the fraction is the controlled experimental condition.
+kwta_fractions: [0.01, 0.05, 0.10, 0.20, 0.30, 0.40]
+
+# Global firing thresholds swept only in "threshold" mode (legacy fallback).
+thresholds: [1.5, 3.0, 5.0, 8.0, 16.0, 24.0, 32.0, 48.0, 64.0]
+
+# --- Output paths ---
+results_dir: "./results/pilot"

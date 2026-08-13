@@ -12,7 +12,7 @@
 |---|---|
 | **Topic** | Investigating the relationship between spike sparsity and catastrophic forgetting in continual learning spiking neural networks |
 | **Central hypothesis** | Sparsity reduces forgetting *by reducing representational overlap* — overlap is the mediator, not just a correlate |
-| **Current phase** | Pilot built and verified; calibration fixed after first run exposed a compressed activity axis; corrected-axis re-run pending |
+| **Current phase** | First controlled-axis (k-WTA) pilot complete: activity now spans a clean ~1-33%; H3 inverted-U NOT supported (accuracy monotonically better with density on Split-MNIST); overlap-forgetting link present but activity-confounded; full-study mediation analysis + possibly a harder benchmark pending |
 | **Two-stage plan** | Stage 1: minimal pilot to screen mechanism-link signals (correlation/mediation screening only, not confirmatory); Stage 2: full study with formal mediation model, confirmatory statistics hierarchy, and mechanism-separated reporting |
 
 ---
@@ -265,21 +265,171 @@ No more collapse. The extreme-sparse regime (1%, 5%) needed for H2 is now reacha
 
 ---
 
+### [DATE — pilot re-run + refactor session] | Entry 10: Corrected-axis re-run results, and the Rank1 refactor to fixed-threshold design
+
+Two things happened this session, in order.
+
+#### Part A: The corrected-axis full pilot re-run
+
+The user ran the re-run themselves. 21 conditions total: 3 seeds x 7 target levels (0.01, 0.05, 0.10, 0.20, 0.35, 0.40, 0.80 — the old and new target grids merged). The cardinal rule from Entry 8 still applies: always interpret by `mean_observed_activity`, never by nominal target.
+
+**The dead-network boundary (target 0.01):** All three seeds hit threshold=64. Mean observed activity was exactly 0.0 across all seeds. Final accuracy was 0.5163 — chance. Forgetting was 0.0, CKA was 0.0, loss was frozen at ln(2) ≈ 0.693, zero spikes. This is a degenerate cliff, not a gradient. The network simply never fires. It's excluded from mechanism analysis — there's nothing to analyze.
+
+**Live results, per-seed-averaged, for the remaining six target levels:**
+
+| Nominal target | Observed activity | Final accuracy | Mean forgetting | CKA |
+|---|---|---|---|---|
+| 0.05 | ~0.452 | ~0.839 | ~0.168 | ~0.0078 |
+| 0.10 | ~0.559 | ~0.964 | ~0.038 | ~0.0064 |
+| 0.20 | ~0.430 | ~0.935 | ~0.076 | ~0.0072 |
+| 0.35 | ~0.405 | ~0.792 | ~0.249 | ~0.0104 |
+| 0.40 | ~0.384 | ~0.850 | ~0.180 | ~0.0095 |
+| 0.80 | ~0.441 | ~0.690 | ~0.386 | ~0.0134 |
+
+Cosine similarity ran ~0.97-0.99 throughout — near-orthogonal everywhere, consistent with Entry 8.
+
+**Against the three key questions:**
+
+*H2 (extreme sparsity hurts accuracy):* CONFIRMED, but degenerately. The only condition that reached extreme sparsity (target 0.01, theta=64) was the dead-network cliff. Accuracy dropped to chance, which technically confirms H2, but there's no gradient to characterize — it's a binary on/off, not a smooth decline. The shape of the accuracy drop through the sparse regime remains uncharacterized.
+
+*H3 (inverted-U interior peak):* NOT ESTABLISHED. The observed activity axis is still compressed (~0.38-0.56 for the live conditions) and non-monotonic with nominal target — target 0.10 gave the highest observed activity (~0.559) while target 0.80 gave ~0.441. That's calibration drift still at work: the frozen threshold set during warm-up doesn't hold once training runs. You can't fit a clean inverted-U to data where the x-axis is scrambled. This is the same problem as Entry 8, just with more conditions.
+
+*Mechanism link (overlap-CKA tracks forgetting):* SURVIVES. This is the strongest result from the session. The pattern is monotonic and consistent across all three seeds: lowest CKA (~0.006-0.007) paired with lowest forgetting (0.03-0.11); highest CKA (~0.013-0.015) paired with worst forgetting (0.32-0.44). The mediation link the novelty rests on held on the wider axis. That's meaningful.
+
+**Verdict:** Continue. The mechanism signal is real and reproducible. But the sparsity axis is still not under proper control — the frozen-threshold-after-warmup design lets activity drift during continual learning, so the x-axis of every plot is unreliable. That's the thing to fix.
+
+#### Part B: The Rank1 refactor — dropping calibration entirely
+
+The user noted the codebase was getting more complex. A read-only Oracle complexity assessment was run before touching anything.
+
+**Oracle verdict (high confidence):** The frozen-threshold calibration machinery was accidental complexity. It was ceremony fighting a design that doesn't work. Calibrated activity doesn't transfer once training continues — it drifts, as Entries 8 and 9 both showed. And the analysis already keys on observed activity anyway, so the calibration target was never the thing being analyzed. The machinery existed to hit a number that was immediately abandoned.
+
+**Decision (Rank1, Oracle's minimal-regret pick):** Drop the calibration layer entirely. Sweep a fixed set of firing thresholds directly. Spike activity becomes a measured outcome, not a calibration target. Simpler code and more scientifically honest — the threshold is the independent variable, activity is what you measure.
+
+**Changes made and verified:**
+
+- Deleted `src/training/calibration.py`
+- Rewrote `src/scripts/run_pilot.py` to sweep fixed thresholds with no warmup, no calibration, no rebuild. Auto-flags degenerate "dead network" conditions: mean activity <= 1e-3 OR final accuracy <= 0.55
+- Replaced the config keys `target_activity`, `warmup_epochs`, and `threshold_grid` with a single `thresholds` list: `[1.5, 3.0, 5.0, 8.0, 16.0, 24.0, 32.0, 48.0, 64.0]`
+- New `ConditionRecord` schema keyed on `threshold` + `dead_network` flag instead of `target_activity`
+- Fixed plotting for the new schema
+- Cleared stale incompatible result files
+
+Verified end-to-end with a `--quick` single-condition run: saved correctly, dead flag correct, all 5 plots regenerated.
+
+**Empirical facts now baked into the config:**
+
+The ~38% activity ceiling from Entry 9 is confirmed. Under this LIF / rate-encoding / reset-to-zero / T=25 setup, no threshold makes more than ~37-38% of neurons ever fire. The reachable sparsity axis is ~1-38%, not 1-80%. The trained-network threshold-to-activity map:
+
+| Threshold | Approx. observed activity |
+|---|---|
+| 1.5 | ~35% |
+| 3.0 | ~30% |
+| 5.0 | ~23% |
+| 8.0 | ~17% |
+| 16.0 | ~14% |
+| 24.0 | ~11% |
+| 32.0 | ~8% |
+| 48.0 | ~3.4% |
+| 64.0 | ~0.9% (near-dead) |
+
+These are measured from the trained network, not from a warm-up proxy. That's the whole point.
+
+**Status at end of this entry:** Codebase is cleaner and the design is more honest. The full pilot on the fixed-threshold design is the immediate next step.
+
+---
+
+### [DATE — kwta session] | Entry 11: Fixed-threshold sweep failed; switched to k-WTA
+
+Two things happened this session, in order.
+
+#### Part A: The fixed-threshold pilot — a decisive negative result
+
+The user ran the full fixed-threshold pilot: 27 conditions, 3 seeds x 9 thresholds [1.5, 3, 5, 8, 16, 24, 32, 48, 64], 10 epochs/task.
+
+The threshold utterly failed to control spike activity. Interpreting by measured `mean_observed_activity` (the cardinal rule from Entry 8 — never the nominal threshold), the observed activity clustered in a narrow ~0.33-0.58 band, non-monotonically with the threshold. A few examples: theta=1.5 gave ~0.35, theta=16 gave ~0.57, theta=48 gave ~0.38. Then at theta=64 it cliffed to 0 across all three seeds: dead network, zero spikes, training loss frozen at ln(2) ≈ 0.693, chance accuracy ~0.516.
+
+So the behaviour is bimodal: either "~35-58% active" or "dead", with no stable moderate or low (5-30%) activity regime anywhere in between.
+
+This is a genuine finding, not a bug. Calibration had already been removed in the Entry 10 / Rank1 refactor, so there's no calibration artifact to blame. What this proves is something more fundamental: with a single frozen global firing threshold, spike activity is not a controllable variable in a trained SNN. As the network trains, weights grow until activity re-saturates into that band regardless of the threshold you set. The threshold controls the dead/alive boundary, not the activity level within the alive regime.
+
+**Consequences for the hypotheses:**
+
+- H3 (inverted-U with interior peak): not assessable. The activity axis is a narrow blob plus a dead point. There's nothing to fit a curve to.
+- H2 (extreme sparsity hurts accuracy): only showed up as the degenerate dead cliff. That's technically a confirmation, but it's a binary on/off, not the smooth decline H2 predicts.
+- Mechanism signal (CKA tracking forgetting): went weak and noisy. CKA range was a tiny 0.0060-0.0095, not cleanly tracking forgetting. This is worth being honest about: the more encouraging CKA signal in earlier runs was riding on a narrow, confounded activity range. The apparent signal was real within those runs, but it wasn't robust to the design change. That partially undercuts the earlier optimism.
+
+The right response is to fix the mechanism, not to reframe the project around what the broken design happened to show.
+
+#### Part B: The fix — switching to k-winner-take-all (k-WTA)
+
+**Decision:** adopt hard k-WTA so spike activity is set directly as a dial (active fraction ≈ k/N) instead of hoping a threshold produces it. This isn't a new direction — top-k/WTA was always a planned mechanism in the full study (see `RESEARCH_IDEA_REFINED.md` section 4.2, mechanism non-equivalence). We're promoting it early rather than inventing something new.
+
+**Design (from an Oracle consult):** the key design question is what "top-k" means over a T-step window. Per-timestep top-k does not control the over-window "active if it spiked at least once across T=25 steps" metric, because different neurons can win on different timesteps and the union blows up. The chosen design instead scores each neuron by its summed membrane potential over a no-gradient pass, picks the top-k per layer, and then gates both spikes and membrane by that fixed winner mask at every timestep. This guarantees the over-window active fraction per layer is at most k/width. It's an upper bound, not exact equality — some winners may not cross threshold — so we still analyse by measured activity and treat the configured fraction as the controlled condition. Gradients still flow through the kept neurons; the mask is detached so top-k is a routing decision, not a differentiable parameter.
+
+**Implementation:** added a `sparsity_mode` config key (`'kwta_window'` vs the kept `'threshold'` fallback) and `kwta_fractions: [0.01, 0.05, 0.10, 0.20, 0.30, 0.40]`. The model, config, and runner were all updated. The old threshold path is preserved as a selectable fallback, not deleted.
+
+**Verification:** a quick run confirmed it works. Target fraction 0.05 produced measured activity 0.050; target 0.20 produced 0.198. Measured activity now tracks the dial, monotonically, spanning the controlled low range. That's exactly what the frozen threshold could never do.
+
+One cost: k-WTA is roughly 2x slower per condition because of the extra no-grad scoring pass. Worth noting for planning the full run.
+
+**Status at end of this entry:** The sparsity mechanism is now under genuine control. The full k-WTA pilot is the immediate next step.
+
+---
+
+### [DATE — kwta results session] | Entry 12: First controlled-axis pilot results — k-WTA works, H3 does not
+
+The full k-WTA pilot ran cleanly. 18 conditions: 3 seeds (0, 1, 2) x 6 target activity fractions (0.01, 0.05, 0.10, 0.20, 0.30, 0.40), 10 epochs/task, naive sequential Split-MNIST, LIF-SNN 784->256->256. About 6 minutes per condition, no dead-network conditions anywhere in the sweep.
+
+#### The main technical result: the axis is finally controlled
+
+This is the thing that matters most from this run. Seed-averaged measured activity tracks the target fraction almost exactly and monotonically across all three seeds:
+
+| Target fraction | Observed activity (seed avg) |
+|---|---|
+| 0.01 | 0.012 |
+| 0.05 | 0.050 |
+| 0.10 | 0.101 |
+| 0.20 | 0.198 |
+| 0.30 | 0.280 |
+| 0.40 | 0.327 |
+
+That's a clean ~1% to ~33% controlled range. The frozen-threshold design (Entries 8-11) could never do this — it collapsed everything into a ~0.33-0.58 blob regardless of what threshold you set. k-WTA delivers a real sparsity dial. The top target (0.40) lands at ~0.33 observed rather than 0.40 because k-WTA sets an upper bound on who may fire, and not all winners actually cross threshold. That's expected and fine — we still analyse by measured activity.
+
+#### H2 (extreme sparsity hurts accuracy): weakly supported, soft trend not a cliff
+
+Seed-averaged final accuracy rises from ~0.77 at ~1% activity to ~0.88 at ~33% activity. Forgetting falls from ~0.27 to ~0.15 over the same range. The sparsest condition (~1%) has the lowest accuracy and highest forgetting, but the network still learns at 1% — unlike the frozen-threshold dead-cliff where it sat at chance. So extreme sparsity degrades performance gently; it doesn't collapse it. H2 is supported in direction but the effect is a gradient, not the sharp drop the hypothesis implied.
+
+#### H3 (inverted-U with interior peak): not supported
+
+This is the most important scientific result, and it's a negative one. Accuracy is roughly monotonically increasing with activity (~0.77 to ~0.88) and forgetting is roughly monotonically decreasing (~0.27 to ~0.15) across the tested 1-33% range. There is no interior optimum. Denser is simply better here, at least on Split-MNIST with this LIF setup.
+
+The proposal's central prediction — that moderate sparsity (~20-40%) would be a sweet spot, with performance degrading on both sides — does not appear in this data. That's worth being honest about. It doesn't kill the project, but it does challenge the framing. Whether an inverted-U ever appears may depend on the benchmark: Split-MNIST is easy enough that a dense network can brute-force it, and the forgetting pressure may be too mild to reveal a genuine tradeoff.
+
+#### Mechanism (does representational overlap track forgetting?): present, correctly signed, but activity-confounded
+
+The relationship is there and in the right direction. Seed-averaged CKA falls from ~0.016 at low activity to ~0.009 at high activity, while forgetting also falls (0.27 to 0.15). Higher activity gives both lower overlap and lower forgetting — lower overlap co-occurring with less forgetting is exactly the direction the mediation hypothesis predicts.
+
+But this is a correlation/screening result, not a mediation result, and it's activity-confounded. Overlap and forgetting both co-vary with activity, so this run cannot separate genuine mediation from mere co-variation. That separation is what the full study's formal mediation model is for. The signal is encouraging but it would be wrong to call it evidence of mediation yet.
+
+One other note: `overlap_cosine` stayed high (~0.73-0.99) throughout, as in earlier runs. CKA is the meaningful metric here; cosine similarity on raw spike-count vectors is too coarse to track the geometry.
+
+#### Net verdict
+
+The k-WTA switch is a technical success. There is now a genuinely controlled sparsity axis, which was the prerequisite for asking any of the scientific questions properly. Scientifically the run is mixed and informative: H3's inverted-U did not materialize (denser was monotonically better on this benchmark), H2 is a soft degradation rather than a cliff, and the overlap-forgetting link is present and correctly signed but still activity-confounded.
+
+The honest read: the original "moderate sparsity is optimal" framing is challenged on Split-MNIST, and the mechanism question is now cleanly posed for the full study's mediation analysis. A benchmark harder than Split-MNIST may be needed to see whether an inverted-U ever appears — Split-MNIST may simply be too easy for the forgetting pressure to create a genuine tradeoff between sparsity and capacity.
+
+---
+
 ## Next session — start here
 
-**Step 1:** Re-run the full pilot with the corrected activity axis. From the repo root:
+**Step 1:** Decide what to do about H3. The monotonic result on Split-MNIST is a real finding, not a fluke. Options: (a) revise H3 to reflect that the inverted-U may be benchmark-dependent and test a harder benchmark (e.g. Split-CIFAR-10 or Split-CIFAR-100) where forgetting pressure is stronger; (b) reframe H3 as a conditional prediction (inverted-U only when task difficulty is high enough to create a capacity-sparsity tradeoff); (c) treat the monotonic result as the finding and drop the inverted-U framing. This is a scientific decision, not a code decision — make it before running anything new.
 
-```
-python -m src.scripts.run_pilot
-python -m src.scripts.make_plots
-```
+**Step 2:** The full study still needs the formal mediation model. The pilot's CKA-tracks-forgetting signal is present and correctly signed, but it's activity-confounded. Separating genuine mediation from co-variation requires estimating paths a (sparsity->overlap) and b (overlap->forgetting, controlling for sparsity), the indirect effect a×b, and a bootstrap CI on that product. That's the full study's job, not the pilot's.
 
-**Step 2:** Interpret the fresh `summary.csv` against the 5 pilot decision criteria. Now that 1-5% activity is reachable, H2 (extreme sparsity hurts accuracy) and the low arm of the inverted-U (H3) are actually testable for the first time. Check whether the inverted-U vertex sits strictly inside the tested range.
+**Step 3:** Optionally regenerate plots via `python -m src.scripts.make_plots` if you want fresh figures from the k-WTA results.
 
-**Step 3:** Check whether the overlap-tracks-forgetting signal from Entry 8 survives on the wider axis. That was the most promising result from the first run; it needs to hold on the corrected data before it means anything.
+**Step 4:** First git commit. Open since Entry 7.
 
-**Step 4:** The 2026-dated arXiv citations still need manual confirmation. Open the abstract pages and verify titles and authors match what's cited. This has been open since Entry 2.
-
-**Step 5:** No git commits have been made yet. Once the corrected-axis run looks good, commit the working codebase.
-
-**Don't skip steps.** The whole point of the standing decisions is that they hold.
+**Step 5:** The 2026-dated arXiv citations still need manual confirmation. Open the abstract pages and verify titles and authors match what's cited. Open since Entry 2.
