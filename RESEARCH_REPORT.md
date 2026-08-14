@@ -2,7 +2,7 @@
 
 **Author:** Graduate Research Project  
 **Date:** July 2026  
-**Status:** Pilot complete — screening results reported in Section 11; full study pending  
+**Status:** Pilot complete — controlled-activity (k-WTA) results in Sections 11.8–11.9; the sparsity "sweet spot" (H3) was not supported on Split-MNIST, and a formal mediation test (Section 11.9) found no evidence that representational overlap mediates the sparsity–forgetting relationship beyond activity co-variation (H4 also not supported at pilot scale); the mechanism remains a hypothesis the full study must test with more seeds, a decoupled activity range, and a harder benchmark; full study pending  
 **Software stack:** Python 3.x, PyTorch 2.12.0, torchvision 0.27.0, snntorch 0.9.4, numpy 2.4.6, scikit-learn 1.9.0, matplotlib 3.11.0, pandas 3.0.3, scipy 1.17.1
 
 ---
@@ -10,6 +10,8 @@
 ## Abstract
 
 Catastrophic forgetting — the tendency of neural networks to lose performance on earlier tasks when trained on new ones — remains one of the central unsolved problems in machine learning. Biological neural systems, by contrast, learn over long timescales while maintaining sparse, event-driven activity patterns. This project investigates whether spike sparsity in spiking neural networks (SNNs) reduces catastrophic forgetting in continual learning settings, and whether that reduction is explained by a specific mechanism: lower representational overlap between sequentially learned task representations. The central claim is a mediation hypothesis — sparsity reduces forgetting *through* reduced overlap, not merely alongside it — which distinguishes this work from prior SNN continual learning studies that use sparse activation as a tool without characterizing the causal pathway. The study proceeds in two stages. A pilot experiment on Split-MNIST with threshold-controlled sparsity and three random seeds screens the correlation precondition: does moderate sparsity (roughly 20–40% active neurons) associate with lower overlap and lower forgetting? If the precondition holds, a full study runs a formal mediation model across three sparsity mechanisms (spike threshold, winner-take-all, activity regularization), two continual learning settings (task-incremental and class-incremental), and multiple CL methods (naive, replay, EWC, SI, LwF), with 8–10 confirmatory seeds and a pre-registered confirmatory test hierarchy. The novelty survives only if the indirect effect of sparsity on forgetting through overlap is significantly nonzero after conditioning on confounds; a significant total effect with a nonsignificant indirect effect would indicate that sparsity acts through reduced plasticity or capacity rather than through representational separation, which would substantially weaken the contribution.
+
+**Framing update (post-pilot).** The pilot has since been run with a mechanism that *actually controls* spike activity — a fixed-window k-winner-take-all (k-WTA) gate, adopted after a frozen firing threshold proved unable to hold activity at a target level in a trained network (Section 11.8). On the resulting controlled activity axis (roughly 1–33% active neurons on Split-MNIST), the predicted inverted-U did **not** appear: accuracy rose and forgetting fell monotonically as activity increased, with no interior optimum. The "moderate sparsity is best" prediction (H3) is therefore **not supported on Split-MNIST**, and is retained only as an open question for a harder benchmark (Split-CIFAR) where capacity pressure is real. A subsequent exploratory mediation analysis on the 18 k-WTA conditions (Section 11.9) found no evidence that representational overlap (CKA) mediates the sparsity–forgetting relationship beyond activity co-variation: the indirect effect $a \times b$ was +0.128 with a 95% bootstrap CI of [−0.586, +0.994], which includes zero, and the b-path coefficient was weakly negative rather than the positive value the hypothesis requires. H4 is therefore also **not supported at pilot scale on Split-MNIST**. The pilot has thus produced two clean negative screening results — no inverted-U (H3) and no overlap-mediation signal (H4) — on an easy benchmark with n = 18 conditions and three seeds. These are not refutations of the underlying idea; they are the expected output of an underpowered screening run on a benchmark where capacity pressure is low and the CKA range is minuscule (approximately 0.009–0.016). The contribution of the pilot is a rigorously controlled activity axis plus two honest negative screens that redirect the full study: more seeds (8–10), a wider and better-decoupled activity range, and a harder benchmark (Split-CIFAR) where representational interference is severe enough to give the mediation model a real signal to detect. The overlap-mediation mechanism remains the central hypothesis; it is simply a hypothesis the full study must test, not a finding the pilot has established.
 
 ---
 
@@ -723,6 +725,64 @@ Cosine similarity between task-mean representations remained high throughout (ap
 **The mechanism signal — representational overlap tracking forgetting — is present and in the hypothesized direction.** CKA falls from approximately 0.016 at the sparse end to approximately 0.009 at the dense end, while forgetting also falls over the same range. Lower overlap co-occurs with less forgetting, consistent with the mediation hypothesis. However, this is activity-confounded: overlap and forgetting both co-vary with activity across the sweep, so this screening run cannot separate genuine mediation from mere co-variation with the common cause. Disentangling them is the job of the full study's formal mediation model, which estimates the indirect effect of sparsity on forgetting through overlap conditional on the direct effect.
 
 **Net assessment.** The k-WTA switch is an engineering success: it delivers the controlled activity axis that is the prerequisite for everything downstream. The scientific picture is mixed and informative. The inverted-U did not materialize on Split-MNIST, which challenges the proposal's central framing and raises the value of two things: the formal mediation analysis (which can still support H4 even without an interior optimum, provided the indirect effect is nonzero) and possibly a harder benchmark such as Split-CIFAR, where representational interference may be severe enough that an interior optimum emerges. The negative H3 result sharpens the project rather than ending it; the novelty now leans more heavily on the mediation story than on the performance-optimum story.
+
+### 11.9 The Mediation Test: No Evidence Beyond Activity Co-Variation
+
+#### 11.9.1 Purpose and Scope
+
+Phase C of the pilot ran a formal mediation analysis on the 18 k-WTA conditions (6 activity fractions $\times$ 3 seeds) to test H4 directly: does representational overlap (CKA) *mediate* the sparsity–forgetting relationship, or does it merely co-vary with activity alongside forgetting? This is an exploratory analysis. With n = 18 observations, three seeds, and a single benchmark, it is severely underpowered for confirmatory inference. The purpose is to screen whether the mediation signal is present at all before committing to the full study's seed count and benchmark scope. No p-values from this analysis are treated as confirmatory evidence.
+
+The implementation used numpy-only OLS with a percentile bootstrap (no new dependency beyond the existing stack). All three variables — observed activity fraction ($X$), linear CKA between task representations ($M$), and mean forgetting ($Y$) — were standardized to zero mean and unit variance before estimation, so all path coefficients are in standard-deviation units and directly comparable in magnitude.
+
+#### 11.9.2 Method
+
+The mediation model follows the structure specified in Section 5.3, simplified to the pilot's single-mechanism, single-seed-level data. Four quantities are estimated:
+
+- **Total effect** $c$: the regression coefficient of $Y$ on $X$ (activity predicting forgetting, ignoring overlap).
+- **Path $a$**: the regression coefficient of $M$ on $X$ (activity predicting CKA overlap).
+- **Path $b$**: the regression coefficient of $Y$ on $M$ conditional on $X$ (overlap predicting forgetting, with activity held constant).
+- **Direct effect** $c'$: the regression coefficient of $Y$ on $X$ conditional on $M$.
+- **Indirect effect** $a \times b$: the product of path $a$ and path $b$, estimated with a 95% percentile bootstrap CI (resampled over the 18 conditions with replacement, 10,000 iterations).
+
+The proportion mediated is $(a \times b) / c$, reported for completeness but interpreted cautiously when the indirect effect is near zero or the wrong sign.
+
+#### 11.9.3 Results
+
+Standardized path estimates:
+
+| Quantity | Estimate |
+|---|---|
+| Total effect $c$ (activity $\to$ forgetting) | $-0.483$ |
+| Path $a$ (activity $\to$ CKA overlap) | $-0.805$ |
+| Path $b$ (CKA overlap $\to$ forgetting $\mid$ activity) | $-0.159$ |
+| Direct effect $c'$ (activity $\to$ forgetting $\mid$ overlap) | $-0.611$ |
+| Indirect effect $a \times b$ | $+0.128$ |
+| 95% bootstrap CI for $a \times b$ | $[-0.586,\ +0.994]$ |
+| Proportion mediated $(a \times b) / c$ | $-0.265$ |
+
+**Verdict: no evidence of mediation beyond activity co-variation.** The bootstrap CI for the indirect effect includes zero by a wide margin. The proportion mediated is negative and nonsensical ($-0.265$), which arises because the indirect effect and the total effect have opposite signs: the total effect of activity on forgetting is negative (more activity, less forgetting), but the indirect path through overlap is positive (more activity reduces overlap via path $a$, but lower overlap is associated with *more* forgetting via path $b$, not less). Path $b$ is weakly negative ($-0.159$) rather than the positive value the mediation hypothesis requires — the hypothesis predicts that lower overlap should predict lower forgetting conditional on activity, but the data show the opposite weak tendency once activity is held constant.
+
+#### 11.9.4 Interpretation
+
+The raw co-movement of CKA and forgetting visible in Section 11.8.4 is explained by both variables co-varying with activity: as activity increases, both CKA and forgetting fall together, producing the apparent correlation. Conditioning forgetting on activity leaves CKA with no additional, correctly-signed contribution. The overlap signal is not carrying information about forgetting beyond what activity already explains.
+
+Combined with the H3 non-result from Section 11.8.4, the pilot has now produced two negative screening results on Split-MNIST: the inverted-U moderate-sparsity optimum did not appear, and the overlap-mediation mechanism did not survive conditioning on activity. Both H3 and H4 are unsupported at pilot scale on this benchmark.
+
+This does not refute the underlying idea. The negative results are consistent with the pilot being underpowered and the benchmark being too easy. On Split-MNIST, the five tasks are binary digit-pair classifications sharing the same input space; representational interference is modest, the CKA range across the entire activity axis is minuscule (approximately 0.009–0.016), and the three variables (activity, CKA, forgetting) are near-collinear, making the b-path coefficient difficult to estimate reliably. The mediation model needs a setting where overlap varies substantially and independently of activity — which requires a harder benchmark and a wider, better-decoupled activity range.
+
+#### 11.9.5 Caveats and Full-Study Implications
+
+Several limitations of this analysis must be stated explicitly.
+
+**Sample size.** n = 18 is far too small for reliable mediation estimation. The bootstrap CI spans 1.58 standard-deviation units, which reflects near-total uncertainty about the indirect effect. The analysis can rule out a very large mediation effect but cannot rule out a moderate one.
+
+**Near-collinearity.** Activity, CKA, and forgetting are nearly collinear in this dataset: all three move together monotonically across the activity axis. Conditioning on activity in the b-path regression leaves very little residual variance in CKA to predict forgetting, making the b-path estimate noisy and unstable. A full study that decouples CKA from activity — for example by using a harder benchmark where different activity levels produce more varied overlap patterns — is required to estimate the b-path with any precision.
+
+**CKA range.** The CKA values span only approximately 0.009–0.016 across the entire axis. This is a very narrow range for a mediator; small measurement noise can dominate the signal.
+
+**Exploratory status.** This analysis was not pre-registered and was run after observing the k-WTA results. It is exploratory, not confirmatory. The negative result should be treated as a design signal, not as evidence against the mediation hypothesis.
+
+**Full-study design implications.** The two negative screens sharpen rather than undermine the full study. The required changes are: (1) increase seeds to 8–10 to reduce estimation variance; (2) use a harder benchmark such as Split-CIFAR, where representational interference is more severe and the CKA range is likely wider; (3) design the activity sweep to decouple CKA from activity more effectively, for example by comparing conditions matched on activity but differing in sparsity mechanism (threshold vs. WTA vs. activity regularization), which the full study's multi-mechanism design already provides. A negative result on Split-MNIST with n = 18 is the expected output of a screening run; it does not license abandoning the mediation hypothesis, only redesigning the test.
 
 ---
 

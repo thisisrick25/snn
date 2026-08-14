@@ -6,6 +6,8 @@ Catastrophic forgetting is a persistent problem in continual learning. Artificia
 
 This project asks whether spike sparsity reduces catastrophic forgetting in SNNs, where the useful sparsity range lies, and whether the effect is explained by lower representational overlap between tasks.
 
+**Framing update (post-pilot).** An initial controlled-activity pilot on Split-MNIST reshaped the emphasis of this project. Using winner-take-all gating to hold spike activity at fixed, directly-controlled levels (k-WTA, see Section 4.2), the predicted inverted-U in performance did not appear: over the reachable ~1-33% activity range, denser activity was monotonically better (higher accuracy, lower forgetting), with no interior optimum. The "moderate sparsity is a sweet spot" hypothesis (H3) is therefore not supported on Split-MNIST, and is retained as an open question for a harder benchmark (Split-CIFAR) where capacity pressure is real. Consequently the project's primary contribution is now the *mechanism* question (H4/RQ5): whether reduced representational overlap mediates the sparsity-forgetting relationship. The pilot found overlap (CKA) and forgetting move together in the predicted direction, but both co-vary with activity, so a formal mediation model is required to separate genuine mediation from co-variation. That mediation analysis is the study's headline result, not the shape of the sparsity-performance curve. (See RESEARCH_JOURNAL.md Entries 11-13 and RESEARCH_REPORT.md Section 11.8 for the pilot evidence.)
+
 ## 1. Research questions
 
 ### 1.1 Primary question
@@ -38,7 +40,9 @@ Test: Measure the forgetting score, defined as best_accuracy - current_accuracy,
 
 ### H2: Extreme sparsity harms accuracy
 
-Prediction: SNNs with less than 5% activity will show at least a 50% accuracy drop compared with dense baselines.
+Status (post-pilot): WEAKLY supported on Split-MNIST as a soft gradient, not the predicted cliff. Under controlled k-WTA activity, accuracy declined gently toward the sparse end (about 0.88 at ~33% activity to about 0.77 at ~1%), and the network still learned well at ~1% activity - far from a 50% collapse. The steep drop the prediction anticipated did not occur on Split-MNIST, consistent with the task being easy enough that even ~1% active neurons carry enough capacity. (Note: this contrasts sharply with the failed frozen-threshold approach, where the sparsest setting produced a *dead* network at chance accuracy - that was a threshold artifact, not a genuine capacity limit; see Section 4.2 and RESEARCH_JOURNAL.md Entry 11.)
+
+Prediction (original): SNNs with less than 5% activity will show at least a 50% accuracy drop compared with dense baselines.
 
 Mechanism: If too few neurons are active, the network may not have enough capacity to represent task-specific features.
 
@@ -46,7 +50,11 @@ Test: Measure classification accuracy at 1%, 5%, and 10% activity.
 
 ### H3: The sparsity-performance relationship is non-linear
 
-Prediction: Continual learning performance will follow an inverted-U pattern, with the best performance around 20-40% activity.
+Status (post-pilot): NOT SUPPORTED on Split-MNIST. On the controlled-activity k-WTA pilot (3 seeds x 6 target activity fractions spanning observed ~1-33%), continual-learning performance was monotonic, not inverted-U: accuracy increased with activity (about 0.77 at ~1% activity up to about 0.88 at ~33%) and forgetting decreased (about 0.27 down to about 0.15), with no interior peak. Denser activity was simply better across the reachable range. This is a genuine negative result against the sweet-spot prediction, and it corrects a prior-attempt artifact in which an apparent inverted-U existed only in firing-threshold space and vanished when keyed on achieved activity (see RESEARCH_JOURNAL.md Entry 12 and the archive comparison).
+
+Prediction (original, retained for the harder-benchmark test): Continual learning performance will follow an inverted-U pattern, with the best performance around 20-40% activity.
+
+Open question: The inverted-U may still appear where capacity pressure is real. Split-MNIST is easy enough that a two-hidden-layer LIF network has ample capacity even at ~1% activity, so there is no accuracy penalty for extreme sparsity to trade against. H3 is therefore retained as a test for a harder benchmark (Split-CIFAR), not as a claim about Split-MNIST.
 
 Test: Fit a quadratic regression to accuracy as a function of sparsity and test for non-linearity with an F-test at p < 0.05.
 
@@ -54,11 +62,15 @@ Interior-peak requirement: A significant quadratic term is necessary but not suf
 
 Mechanism-separation requirement: The inverted-U must be established per sparsity mechanism (threshold, winner-take-all, activity regularization) before any pooled curve is reported. Mechanistically different interventions are not pooled unless their individual curves agree (see Section 4.2).
 
-### H4: Representational overlap mediates the sparsity-forgetting relationship
+### H4 (PRIMARY): Representational overlap mediates the sparsity-forgetting relationship
+
+This is now the project's headline hypothesis. With the inverted-U (H3) not supported on Split-MNIST, the central contribution is no longer the shape of the sparsity-performance curve but the *mechanism*: whether reduced representational overlap is what links sparsity to reduced forgetting.
 
 Prediction: The effect of spike sparsity on forgetting is at least partially mediated by reduced representational overlap between tasks. That is, increasing sparsity reduces overlap (path a), and lower overlap predicts lower forgetting conditional on sparsity (path b), such that the indirect effect (a x b) is significantly different from zero.
 
-Rationale: This is the central novelty of the project. Prior SNN continual-learning work already establishes that sparse activation, threshold modulation, and spike budgeting can reduce forgetting; what remains under-characterized is *why*. Establishing overlap as a mediator (rather than merely a correlate) is what distinguishes this study from occupied territory (e.g., Shen et al. 2024). Correlation across sparsity levels is not mediation.
+Status (post-pilot): TESTED at pilot scale, NOT SUPPORTED. The raw precondition held - CKA overlap and forgetting moved together in the predicted direction (CKA fell from about 0.016 to about 0.009 as activity rose, and forgetting fell alongside it) - but a formal exploratory mediation model (Section 3.5; n = 18 conditions, 3 seeds x 6 activity fractions, numpy OLS with seed-level bootstrap) found no evidence of mediation beyond activity co-variation. Standardized paths: total effect c = -0.483; a-path (activity -> overlap) = -0.805; b-path (overlap -> forgetting | activity) = -0.159, which is weak and wrong-signed for the hypothesis; direct effect c' = -0.611; indirect effect a x b = +0.128 with a 95% bootstrap CI of [-0.586, +0.994] that straddles zero. Conditional on activity, overlap adds nothing: the apparent overlap-forgetting link is explained by both quantities co-varying with activity, not by overlap mediating the effect. This is a second negative screening result (alongside H3), and it directly undercuts the "central novelty" framing below. Caveats keep it from being fatal: n = 18 is tiny and underpowered, the three variables are near-collinear (all tightly coupled to activity, so the b-path is hard to estimate), and the CKA range is minuscule (about 0.009-0.016). Mediation therefore remains the study's primary open question, deferred to the full study (8-10 seeds, a decoupled activity range, and a harder benchmark such as Split-CIFAR); it is no longer a claim the pilot supports.
+
+Rationale: This is the intended central novelty of the project, though the pilot screen above did not yet support it. Prior SNN continual-learning work already establishes that sparse activation, threshold modulation, and spike budgeting can reduce forgetting; what remains under-characterized is *why*. Establishing overlap as a mediator (rather than merely a correlate) is what would distinguish this study from occupied territory (e.g., Shen et al. 2024) - but that hinges on a properly powered mediation test that the pilot could not deliver. Correlation across sparsity levels is not mediation.
 
 Test: A formal mediation model estimating the indirect effect with a bootstrap confidence interval, conditional on confounds (see Section 3.5). A significant negative correlation between overlap and forgetting is a necessary precondition but is not, by itself, accepted as evidence of mediation.
 

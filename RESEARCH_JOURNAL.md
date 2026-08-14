@@ -12,7 +12,7 @@
 |---|---|
 | **Topic** | Investigating the relationship between spike sparsity and catastrophic forgetting in continual learning spiking neural networks |
 | **Central hypothesis** | Sparsity reduces forgetting *by reducing representational overlap* — overlap is the mediator, not just a correlate |
-| **Current phase** | First controlled-axis (k-WTA) pilot complete: activity now spans a clean ~1-33%; H3 inverted-U NOT supported (accuracy monotonically better with density on Split-MNIST); overlap-forgetting link present but activity-confounded; full-study mediation analysis + possibly a harder benchmark pending |
+| **Current phase** | Phase C complete: formal mediation analysis run on 18 k-WTA conditions (Split-MNIST). Both H3 (inverted-U) and the overlap->forgetting mediation mechanism (H4) are unsupported at pilot scale — two negative screens. Project continues toward a fuller study (more seeds, harder benchmark, decoupled activity range) |
 | **Two-stage plan** | Stage 1: minimal pilot to screen mechanism-link signals (correlation/mediation screening only, not confirmatory); Stage 2: full study with formal mediation model, confirmatory statistics hierarchy, and mechanism-separated reporting |
 
 ---
@@ -422,14 +422,109 @@ The honest read: the original "moderate sparsity is optimal" framing is challeng
 
 ---
 
+### [DATE — reframing session] | Entry 13: The H3 decision and reframing the project around the mechanism
+
+No new experiment ran this session. This entry records a decision and a docs reframing.
+
+#### The situation
+
+The k-WTA pilot (Entry 12) gave a clean, controlled result on Split-MNIST: accuracy rose and forgetting fell monotonically as activity increased over the ~1-33% range. There was no inverted-U. The "moderate sparsity 20-40% is optimal" prediction (H3) was not supported. That forced a decision about what to do with H3 and, more broadly, how to frame the project going forward.
+
+#### The decision: cover all three paths
+
+Rather than picking one response to the negative H3 result, we decided to pursue all three simultaneously.
+
+**Path 1 — accept the negative result.** On Split-MNIST with genuinely controlled activity, there is no sparsity sweet spot. Denser is monotonically better. This is a clean corrective finding, especially against the prior archived attempt whose apparent inverted-U existed only in threshold space and vanished when keyed on achieved activity (the correlation of achieved activity with forgetting was about -0.07, essentially nothing). That earlier apparent signal was an artifact of the broken calibration design, not a real effect. Documenting this honestly is part of the contribution.
+
+**Path 2 — test a harder benchmark.** Split-MNIST is probably too easy: the network still learns reasonably well at ~1% activity, so there is no accuracy cost to trade off against forgetting pressure. An inverted-U requires a genuine capacity-sparsity tradeoff, and Split-MNIST may not impose one. Split-CIFAR-10 is the next candidate. H3 is retained as an open question for that harder benchmark rather than discarded.
+
+**Path 3 — pivot the headline to the mechanism.** The overlap->forgetting relationship (H4, mediation) is now the project's primary contribution. On the controlled k-WTA axis, CKA and forgetting moved together in the predicted direction: CKA fell from about 0.016 to 0.009 as activity rose, and forgetting fell alongside. But both co-vary with activity, so this screening run cannot separate genuine mediation from co-variation. The formal mediation model in the full study is the primary deliverable. That's what makes the project novel — not the sparsity sweet spot, which didn't survive contact with a properly controlled axis.
+
+#### What actually changed this session (docs only, no code)
+
+**`RESEARCH_IDEA_REFINED.md`:** Added a post-pilot "Framing update" paragraph to the research statement. Prepended a "Status (post-pilot)" note to each of H2, H3, and H4. H2's note records that it is weakly supported as a soft gradient rather than the predicted cliff — the network still learns at ~1% activity, no 50% collapse. H3's note records that it is not supported on Split-MNIST (monotonic, not inverted-U) and is retained for the harder-benchmark test. H4's note retitles it "H4 (PRIMARY)" and records that the precondition is met but mediation is still untested.
+
+**`RESEARCH_REPORT.md`:** Updated the status line and added a "Framing update (post-pilot)" paragraph to the abstract so the report now leads with the mechanism and records the H3 negative result. Section 11.8 already held the k-WTA data; no changes were needed there.
+
+#### The plan from here
+
+Three phases, in order.
+
+Phase A is this docs reframing. Done.
+
+Phase B is adding Split-CIFAR-10 to the pilot. The minimal approach is a dataset toggle in the config: input dimension goes from 784 to 3072 (flatten the 32x32x3 image), keeping the same k-WTA mechanism and fraction sweep. A small convolutional SNN frontend is worth adding later only if the plain flatten-to-MLP-LIF is too weak to show any signal at all. The goal is to find out whether real capacity pressure makes an inverted-U appear.
+
+Phase C is the formal mediation model. This is the thing that separates genuine overlap-mediation from activity co-variation. It requires estimating path a (sparsity->overlap), path b (overlap->forgetting, controlling for sparsity), the indirect effect a×b, and a bootstrap CI on that product. That's the full study's job, and it's now the headline deliverable.
+
+One honest tension worth recording: the project's original headline — a sparsity sweet spot — did not survive contact with a properly controlled activity axis. That's a real result. The mechanism question it sharpens is arguably the more interesting contribution anyway, but it's worth being clear-eyed that the framing shifted because the data forced it, not because we planned it this way from the start.
+
+---
+
+### [DATE — mediation session] | Entry 14: The mediation model — the mechanism did not survive its first test
+
+Phase C was the formal test of H4: does representational overlap actually mediate the effect of activity on forgetting, or do both just co-vary with activity? This entry records what was built, what the numbers said, and what to make of it.
+
+#### What was built
+
+Two new files: `src/analysis/mediation.py` and `src/scripts/run_mediation.py`. The implementation is numpy-only OLS plus a percentile bootstrap — no new dependency added to the project. The model runs on the 18 k-WTA conditions from Entry 12 (6 activity fractions x 3 seeds, Split-MNIST). All three variables — activity, overlap (CKA), and forgetting — are standardized before estimation so the path coefficients are comparable.
+
+The model estimates five quantities: total effect c (activity -> forgetting), path a (activity -> overlap), path b (overlap -> forgetting, controlling for activity), direct effect c' (activity -> forgetting controlling for overlap), and the indirect effect a*b with a 95% percentile bootstrap CI. Results saved to `results/pilot/metrics/mediation.json`.
+
+#### Why this was necessary
+
+The raw k-WTA pilot (Entry 12) showed CKA overlap and forgetting both falling as activity rises. That's the right direction for the mediation story. But both quantities co-vary with activity, so a raw correlation cannot tell genuine mediation apart from spurious co-variation. The mediation model is the tool for separating them: it estimates path b — the association between overlap and forgetting *after conditioning on activity* — and if that path is near zero or wrong-signed, the apparent overlap-forgetting link is explained by the shared dependence on activity, not by overlap doing any causal work.
+
+#### The result
+
+Standardized estimates, mediator = overlap_cka:
+
+- Total effect c = -0.483 (more activity -> less forgetting, as expected)
+- Path a = -0.805 (more activity -> less overlap, strong and expected)
+- Path b = -0.159 (weak, and the wrong sign)
+- Direct effect c' = -0.611
+- Indirect effect a*b = +0.128, 95% bootstrap CI [-0.586, +0.994]
+- Proportion mediated = -0.265
+
+The b-path is the critical number. Conditional on activity, more overlap associates with slightly *less* forgetting — the opposite of what the hypothesis requires. The indirect effect is positive (because a is negative and b is negative, their product is positive, meaning the mediation pathway would *increase* forgetting, not reduce it), and the bootstrap CI is wide and straddles zero by a large margin. The proportion mediated is negative, which is nonsensical and confirms the model found no coherent mediation structure.
+
+Verdict: no evidence of mediation beyond activity co-variation.
+
+#### What it means
+
+The apparent overlap-tracks-forgetting signal from Entry 12 is explained by both quantities co-varying with activity. Once forgetting is conditioned on activity, overlap adds nothing — the b-path is weak and wrong-signed, and the indirect effect CI includes zero with room to spare.
+
+This is a second negative result stacking on the H3 inverted-U non-result from Entry 12. Because Entry 13 made the mechanism the project's headline contribution, the honest current status is that both the "moderate-sparsity sweet spot" (H3) and the "overlap mediates forgetting" mechanism (H4) are unsupported at pilot scale on Split-MNIST.
+
+That's worth sitting with. The project's original framing (H3 sweet spot) didn't survive a properly controlled activity axis. The reframing around the mechanism (H4 mediation) was the response. Now the mechanism hasn't survived its first formal test either. Two negative screens in a row.
+
+#### The caveats that soften it
+
+These are real, not spin.
+
+n=18 is tiny. The study is severely underpowered for a mediation analysis, where the indirect effect (a product of two estimated paths) needs substantially more data than either path alone. The b-path estimate is noisy enough that the true value could be anywhere in a wide range.
+
+All three variables are tightly coupled to activity. Activity, overlap, and forgetting are nearly collinear in this dataset — the CKA range is only about 0.009 to 0.016, a minuscule spread. When the mediator has almost no variance independent of the predictor, the b-path is very hard to estimate reliably. This is a near-collinearity problem, not necessarily a true null.
+
+This was always framed as an exploratory screen, not a confirmatory test. The pilot was designed to screen for signals worth pursuing, not to confirm or disconfirm the mechanism. A negative screen means "don't count on this signal yet," not "the mechanism is false."
+
+A full study with 8-10 seeds, a wider and more decoupled activity range, and a harder benchmark (Split-CIFAR) could still reveal mediation. The negative result sharpens the design requirements: we need to decouple activity from overlap (so the b-path has something to work with), more seeds (so the indirect effect estimate has lower variance), and capacity pressure (so forgetting is large enough to detect partial mediation).
+
+#### Net position
+
+The pilot has done its job. It screened two signals — the inverted-U and the mediation mechanism — and found neither on Split-MNIST at this scale. That's useful information. The full study design is now clearer: harder benchmark, more seeds, a wider and less collinear activity range, and a pre-registered confirmatory mediation test rather than an exploratory screen.
+
+---
+
 ## Next session — start here
 
-**Step 1:** Decide what to do about H3. The monotonic result on Split-MNIST is a real finding, not a fluke. Options: (a) revise H3 to reflect that the inverted-U may be benchmark-dependent and test a harder benchmark (e.g. Split-CIFAR-10 or Split-CIFAR-100) where forgetting pressure is stronger; (b) reframe H3 as a conditional prediction (inverted-U only when task difficulty is high enough to create a capacity-sparsity tradeoff); (c) treat the monotonic result as the finding and drop the inverted-U framing. This is a scientific decision, not a code decision — make it before running anything new.
+**Immediate:** The user's Split-CIFAR-10 run may change the picture. Under real capacity pressure, forgetting is larger and the activity-overlap-forgetting relationship may be less collinear. Check those results first before drawing any further conclusions about the mechanism.
 
-**Step 2:** The full study still needs the formal mediation model. The pilot's CKA-tracks-forgetting signal is present and correctly signed, but it's activity-confounded. Separating genuine mediation from co-variation requires estimating paths a (sparsity->overlap) and b (overlap->forgetting, controlling for sparsity), the indirect effect a×b, and a bootstrap CI on that product. That's the full study's job, not the pilot's.
+**Full study design:** The mediation analysis needs more seeds (8-10, not 3), a wider and more decoupled activity range (so overlap has variance independent of activity), and a harder benchmark. The confirmatory mediation test should be pre-registered, not exploratory. Plan this before writing any new code.
 
-**Step 3:** Optionally regenerate plots via `python -m src.scripts.make_plots` if you want fresh figures from the k-WTA results.
+**Git:** Phase B and Phase C code (the mediation files and any CIFAR additions) have not been committed yet. Do a proper git commit of all Phase B+C work before the next experiment run.
 
-**Step 4:** First git commit. Open since Entry 7.
+**Citations:** The 2026-dated arXiv preprints (Meem et al. 2026, Roy et al. 2026, Nagabhushana et al. 2026) still need manual confirmation — open the abstract pages and verify titles and authors match what's cited. Open since Entry 2, still unresolved.
 
-**Step 5:** The 2026-dated arXiv citations still need manual confirmation. Open the abstract pages and verify titles and authors match what's cited. Open since Entry 2.
+**Still open from earlier entries:**
+
+- A stray `REPORT.md` file needs to be triaged (check whether it's a duplicate of `RESEARCH_REPORT.md` or something else, and decide whether to keep or delete it).

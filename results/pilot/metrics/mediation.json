@@ -1,0 +1,17 @@
+{
+  "exploratory": true,
+  "note": "pilot-scale screen, not confirmatory; needs more seeds for a confirmatory estimate",
+  "dataset_filter": null,
+  "n": 18,
+  "total_effect_c": -0.48283143494505737,
+  "a_path": -0.8054557591374234,
+  "b_path": -0.1587863814768815,
+  "direct_effect_c_prime": -0.6107268403782036,
+  "indirect_effect": 0.1278954054331461,
+  "indirect_ci": [
+    -0.5856174762626112,
+    0.994202520921943
+  ],
+  "proportion_mediated": -0.2648862443011807,
+  "verdict": "NO EVIDENCE of mediation beyond activity co-variation (indirect CI includes 0)"
+}

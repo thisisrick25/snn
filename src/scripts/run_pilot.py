@@ -54,6 +54,7 @@ import torch
 
 from src.training.seeds import set_seed
 from src.data.split_mnist import build_split_mnist
+from src.data.split_cifar import build_split_cifar
 from src.models.lif_snn import build_model
 from src.training.continual import run_naive_sequential
 from src.analysis.metrics import compute_metrics
@@ -91,19 +92,37 @@ def _mean(xs: list[float]) -> float:
     return sum(vals) / len(vals) if vals else float("nan")
 
 
+_INPUT_DIM = {"mnist": 784, "cifar10": 3072}
+
+
+def build_dataset(cfg: dict, tasks, batch_size: int):
+    """Return (train_loaders, test_loaders) for the configured dataset.
+
+    ``download=True`` so the dataset is fetched on first use; torchvision skips
+    the download when the cache already exists.
+    """
+    name = cfg.get("dataset", "mnist")
+    root = cfg["data_root"]
+    if name == "mnist":
+        return build_split_mnist(root=root, tasks=tasks, batch_size=batch_size, download=True)
+    if name == "cifar10":
+        return build_split_cifar(root=root, tasks=tasks, batch_size=batch_size, download=True)
+    raise ValueError(f"unknown dataset {name!r}; expected 'mnist' or 'cifar10'")
+
+
 def run_condition(cfg: dict, seed: int, condition: float, *, probe_samples: int,
                   epochs: int, device: str = "cpu") -> ConditionRecord:
     timesteps = int(cfg["timesteps"])
     lr = float(cfg["lr"])
-    data_root = cfg["data_root"]
     batch_size = int(cfg["batch_size"])
     tasks = [tuple(t) for t in cfg["tasks"]]
 
+    # input_dim is derived from the dataset so build_model sizes fc1 correctly.
+    cfg["input_dim"] = _INPUT_DIM[cfg.get("dataset", "mnist")]
+
     # 1-2. seed + data
     set_seed(seed)
-    train_loaders, test_loaders = build_split_mnist(
-        root=data_root, tasks=tasks, batch_size=batch_size, download=False
-    )
+    train_loaders, test_loaders = build_dataset(cfg, tasks, batch_size)
 
     # 3. build model for this sparsity condition. In kwta_window mode `condition`
     # is a target activity fraction (build_model derives k per layer); in threshold
@@ -150,6 +169,7 @@ def run_condition(cfg: dict, seed: int, condition: float, *, probe_samples: int,
         overlap_cka=overlap_cka,
         overlap_cosine=overlap_cosine,
         dead_network=dead_network,
+        dataset=cfg.get("dataset", "mnist"),
         train_losses=result.train_losses,
     )
 
@@ -172,9 +192,15 @@ def main() -> None:
                         help="cap CPU threads (default: config num_threads; 0 = all cores)")
     parser.add_argument("--device", choices=["cpu", "cuda", "auto"], default=None,
                         help="compute device (default: config device; auto = cuda if available)")
+    parser.add_argument("--dataset", choices=["mnist", "cifar10"], default=None,
+                        help="benchmark dataset (default: config dataset)")
     args = parser.parse_args()
 
     cfg = load_config(args.config)
+
+    if args.dataset is not None:
+        cfg["dataset"] = args.dataset
+    print(f"[cfg] dataset = {cfg.get('dataset', 'mnist')}", flush=True)
 
     device = resolve_device(args.device, cfg)
     print(f"[cfg] device = {device}", flush=True)

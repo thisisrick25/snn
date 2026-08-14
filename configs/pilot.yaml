@@ -5,8 +5,9 @@
 # --- Reproducibility ---
 seeds: [0, 1, 2]            # 3 seeds; pilot is feasibility-only (p-values not confirmatory)
 
-# --- Dataset (Split-MNIST, task-incremental) ---
-data_root: "./data"        # torchvision downloads MNIST here on first run
+# --- Dataset (task-incremental, 5 binary tasks) ---
+dataset: mnist             # mnist | cifar10; run_pilot derives input_dim from this (784 vs 3072)
+data_root: "./data"        # torchvision downloads the dataset here on first run
 tasks:                     # 5 binary tasks, fixed order; labels remapped to {0, 1} per task
   - [0, 1]
   - [2, 3]
