@@ -12,7 +12,7 @@
 |---|---|
 | **Topic** | Investigating the relationship between spike sparsity and catastrophic forgetting in continual learning spiking neural networks |
 | **Central hypothesis** | Sparsity reduces forgetting *by reducing representational overlap* — overlap is the mediator, not just a correlate |
-| **Current phase** | Phase C complete: formal mediation analysis run on 18 k-WTA conditions (Split-MNIST). Both H3 (inverted-U) and the overlap->forgetting mediation mechanism (H4) are unsupported at pilot scale — two negative screens. Project continues toward a fuller study (more seeds, harder benchmark, decoupled activity range) |
+| **Current phase** | Conv-SNN pilot complete: spiking convolutional frontend built and run on CIFAR-10 (18 k-WTA conditions, 3 seeds x 6 fractions). H2 (extreme sparsity hurts accuracy) now clearly supported for the first time. H3 (inverted-U sweet-spot) still not supported — the real pattern is more-activity-helps-then-saturates. H4 (overlap mediates forgetting) still not supported — 4th negative screen, and the a-path now runs the wrong direction. Consolidated verdict across MNIST-MLP, CIFAR-MLP, CIFAR-Conv recorded. |
 | **Two-stage plan** | Stage 1: minimal pilot to screen mechanism-link signals (correlation/mediation screening only, not confirmatory); Stage 2: full study with formal mediation model, confirmatory statistics hierarchy, and mechanism-separated reporting |
 
 ---
@@ -515,13 +515,48 @@ The pilot has done its job. It screened two signals — the inverted-U and the m
 
 ---
 
+### [DATE — conv-snn session] | Entry 15: The Conv-SNN test — a competent CIFAR model, and what it did (and didn't) change
+
+The CIFAR results on the flatten-MLP were weak and flat — roughly 0.60-0.65 accuracy, barely above chance. That made them useless for testing whether real capacity pressure produces a sparsity sweet-spot: you can't see a tradeoff when the model is already failing. Per the locked "do both" plan, I built a spiking convolutional frontend to get a model that could actually learn CIFAR-10 before asking whether sparsity hurts it.
+
+#### What was built
+
+`src/models/conv_snn.py` — three spiking conv layers (Conv2d 3->16->32->64, 3x3 kernels, each followed by a LIF neuron and 2x2 max-pool), flattening to 1024 features that feed the same two 256-unit LIF hidden layers and per-task heads as the MLP. The k-WTA sparsity control and the activity metric stay on the two FC hidden layers only, so the sparsity axis is identical and directly comparable across the MLP and Conv-SNN runs. A config toggle (`arch: mlp|conv_snn`) selects the architecture; result files are tagged by arch. I also renamed result filenames from `_theta_` to `_frac_` to match the k-WTA mode. An `--arch` filter was added to `run_mediation.py` so mediation can be run cleanly per architecture without mixing the two.
+
+#### The results
+
+18 conditions: 3 seeds x 6 target fractions (0.01, 0.05, 0.10, 0.20, 0.30, 0.40), CIFAR-10, k-WTA. Seed-averaged, interpreted by `mean_observed_activity` as always. One thing to note upfront: observed activity tops out around 0.20 even at the highest target fractions — the conv frontend drives the FC layers less densely than the MLP does, so the upper end of the axis is compressed.
+
+| Target fraction | Observed activity | Accuracy | Forgetting | CKA |
+|---|---|---|---|---|
+| 0.01 | ~0.011 | 0.609 | 0.249 | 0.0037 |
+| 0.05 | ~0.049 | 0.687 | 0.254 | 0.0074 |
+| 0.10 | ~0.094 | 0.705 | 0.255 | 0.0088 |
+| 0.20 | ~0.158 | 0.711 | 0.248 | 0.0085 |
+| 0.30 | ~0.184 | 0.706 | 0.256 | 0.0098 |
+| 0.40 | ~0.204 | 0.713 | 0.226 | 0.0104 |
+
+#### What changed
+
+**The model is now genuinely competent.** About 0.71 accuracy versus the MLP's flat 0.62 — a real nine-point lift. That matters because it means this is finally a fair capacity-pressure test. The MLP was too weak to reveal anything; the Conv-SNN is not.
+
+**H2 (extreme sparsity hurts accuracy) is now clearly supported for the first time.** At roughly 1% activity, accuracy is 0.61. At the plateau (5% and above), it's around 0.71. That's a ten-point penalty for extreme sparsity — visible only because the model is competent enough to have something to lose. The MLP's floor was already so low that the same penalty was invisible. The effect is still a slope, not a catastrophic cliff, but it's real and consistent.
+
+**H3 (inverted-U sweet-spot) is still not supported.** The accuracy curve rises from ~1% activity and then flattens and saturates from about 5% onward. There is no interior peak. Denser is never worse, just no better than moderate. The pattern is more-activity-helps-then-saturates, not an inverted-U.
+
+**H4 (representational overlap mediates forgetting) is still not supported — and this time the mechanism runs the wrong way.** The conv-only mediation analysis (n=18) gave: total effect c = -0.003 (essentially zero), path a = +0.815 (positive — more activity means *more* overlap, the opposite of what the hypothesis requires), path b = +0.037 (near zero), indirect effect a*b = +0.030 with a 95% bootstrap CI of [-0.973, +0.729] (very wide, straddles zero). This is the fourth negative screen for H4. More than that: the a-path is now positive, meaning the first link of the proposed mechanism runs backwards. Sparsity is not reducing representational overlap in this architecture; if anything, denser activity is associated with more overlap. The mechanism is not just absent — its first link is wrong-signed.
+
+#### Consolidated verdict
+
+Across all three result sets — MNIST-MLP, CIFAR-MLP, CIFAR-Conv — the picture is consistent. The one confirmed effect is that very sparse activity hurts accuracy (H2), and it only becomes visible with a capable model. The repeatedly unsupported claims are the inverted-U sweet-spot (H3, where the real pattern is more-activity-helps-then-saturates) and the overlap-mediation mechanism (H4, four negative screens, a-path now wrong-signed). The honest framing: controlled spike sparsity in continual SNNs shows a simple more-activity-helps-then-saturates pattern with a real cost only at extreme sparsity. No sweet-spot, and no evidence that representational overlap mediates forgetting, across two architectures and two benchmarks. All of this is pilot-scale — three seeds, exploratory, not confirmatory.
+
+---
+
 ## Next session — start here
 
-**Immediate:** The user's Split-CIFAR-10 run may change the picture. Under real capacity pressure, forgetting is larger and the activity-overlap-forgetting relationship may be less collinear. Check those results first before drawing any further conclusions about the mechanism.
+**Where things stand:** The Conv-SNN pilot is done. Three result sets exist (MNIST-MLP, CIFAR-MLP, CIFAR-Conv) and are committed or pending commit. The supervisor report and research report are being updated to the MLP->Conv->combined narrative.
 
-**Full study design:** The mediation analysis needs more seeds (8-10, not 3), a wider and more decoupled activity range (so overlap has variance independent of activity), and a harder benchmark. The confirmatory mediation test should be pre-registered, not exploratory. Plan this before writing any new code.
-
-**Git:** Phase B and Phase C code (the mediation files and any CIFAR additions) have not been committed yet. Do a proper git commit of all Phase B+C work before the next experiment run.
+**Next decision:** Consider a full confirmatory study — 8-10 seeds, a decoupled activity/overlap design (so the b-path has something to work with), and possibly GPU acceleration (a cu132 wheel is available in `requirements.txt` but not yet installed). The design question is whether to pre-register a confirmatory mediation test or to treat the whole project as exploratory given the consistent negative screens. That's worth discussing before writing any new code.
 
 **Citations:** The 2026-dated arXiv preprints (Meem et al. 2026, Roy et al. 2026, Nagabhushana et al. 2026) still need manual confirmation — open the abstract pages and verify titles and authors match what's cited. Open since Entry 2, still unresolved.
 

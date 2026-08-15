@@ -56,6 +56,7 @@ from src.training.seeds import set_seed
 from src.data.split_mnist import build_split_mnist
 from src.data.split_cifar import build_split_cifar
 from src.models.lif_snn import build_model
+from src.models.conv_snn import build_conv_model
 from src.training.continual import run_naive_sequential
 from src.analysis.metrics import compute_metrics
 from src.analysis.representations import fixed_subset_loader, extract_representation
@@ -95,18 +96,19 @@ def _mean(xs: list[float]) -> float:
 _INPUT_DIM = {"mnist": 784, "cifar10": 3072}
 
 
-def build_dataset(cfg: dict, tasks, batch_size: int):
+def build_dataset(cfg: dict, tasks, batch_size: int, conv: bool = False):
     """Return (train_loaders, test_loaders) for the configured dataset.
 
     ``download=True`` so the dataset is fetched on first use; torchvision skips
-    the download when the cache already exists.
+    the download when the cache already exists. ``conv=True`` makes the CIFAR
+    loader keep images as [3, 32, 32] (unflattened) for the conv frontend.
     """
     name = cfg.get("dataset", "mnist")
     root = cfg["data_root"]
     if name == "mnist":
         return build_split_mnist(root=root, tasks=tasks, batch_size=batch_size, download=True)
     if name == "cifar10":
-        return build_split_cifar(root=root, tasks=tasks, batch_size=batch_size, download=True)
+        return build_split_cifar(root=root, tasks=tasks, batch_size=batch_size, download=True, conv=conv)
     raise ValueError(f"unknown dataset {name!r}; expected 'mnist' or 'cifar10'")
 
 
@@ -116,19 +118,23 @@ def run_condition(cfg: dict, seed: int, condition: float, *, probe_samples: int,
     lr = float(cfg["lr"])
     batch_size = int(cfg["batch_size"])
     tasks = [tuple(t) for t in cfg["tasks"]]
+    arch = cfg.get("arch", "mlp")
+    is_conv = arch == "conv_snn"
 
-    # input_dim is derived from the dataset so build_model sizes fc1 correctly.
-    cfg["input_dim"] = _INPUT_DIM[cfg.get("dataset", "mnist")]
+    # The MLP path derives fc1 input size from the dataset; the conv frontend
+    # fixes its own feature dim so input_dim is irrelevant there.
+    if not is_conv:
+        cfg["input_dim"] = _INPUT_DIM[cfg.get("dataset", "mnist")]
 
-    # 1-2. seed + data
+    # 1-2. seed + data (conv keeps CIFAR images unflattened as [3, 32, 32])
     set_seed(seed)
-    train_loaders, test_loaders = build_dataset(cfg, tasks, batch_size)
+    train_loaders, test_loaders = build_dataset(cfg, tasks, batch_size, conv=is_conv)
 
     # 3. build model for this sparsity condition. In kwta_window mode `condition`
-    # is a target activity fraction (build_model derives k per layer); in threshold
+    # is a target activity fraction (the builder derives k per layer); in threshold
     # mode it is the global firing threshold. set_threshold only applies to the
     # latter (in kwta mode the threshold is left at its default and k gates firing).
-    model = build_model(cfg, condition)
+    model = build_conv_model(cfg, condition) if is_conv else build_model(cfg, condition)
     if cfg.get("sparsity_mode", "threshold") == "threshold":
         model.set_threshold(condition)
     model.to(device)
@@ -170,6 +176,7 @@ def run_condition(cfg: dict, seed: int, condition: float, *, probe_samples: int,
         overlap_cosine=overlap_cosine,
         dead_network=dead_network,
         dataset=cfg.get("dataset", "mnist"),
+        arch=arch,
         train_losses=result.train_losses,
     )
 
@@ -194,6 +201,8 @@ def main() -> None:
                         help="compute device (default: config device; auto = cuda if available)")
     parser.add_argument("--dataset", choices=["mnist", "cifar10"], default=None,
                         help="benchmark dataset (default: config dataset)")
+    parser.add_argument("--arch", choices=["mlp", "conv_snn"], default=None,
+                        help="model architecture (default: config arch; conv_snn needs cifar10)")
     args = parser.parse_args()
 
     cfg = load_config(args.config)
@@ -201,6 +210,10 @@ def main() -> None:
     if args.dataset is not None:
         cfg["dataset"] = args.dataset
     print(f"[cfg] dataset = {cfg.get('dataset', 'mnist')}", flush=True)
+
+    if args.arch is not None:
+        cfg["arch"] = args.arch
+    print(f"[cfg] arch = {cfg.get('arch', 'mlp')}", flush=True)
 
     device = resolve_device(args.device, cfg)
     print(f"[cfg] device = {device}", flush=True)

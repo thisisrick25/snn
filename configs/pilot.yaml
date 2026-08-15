@@ -7,6 +7,7 @@ seeds: [0, 1, 2]            # 3 seeds; pilot is feasibility-only (p-values not c
 
 # --- Dataset (task-incremental, 5 binary tasks) ---
 dataset: mnist             # mnist | cifar10; run_pilot derives input_dim from this (784 vs 3072)
+arch: mlp                  # mlp | conv_snn; conv_snn uses unflattened [3,32,32] CIFAR (cifar10 only)
 data_root: "./data"        # torchvision downloads the dataset here on first run
 tasks:                     # 5 binary tasks, fixed order; labels remapped to {0, 1} per task
   - [0, 1]

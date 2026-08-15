@@ -46,6 +46,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Exploratory mediation analysis over pilot results.")
     parser.add_argument("--config", default="configs/pilot.yaml")
     parser.add_argument("--dataset", default=None, help="filter to one dataset (mnist|cifar10)")
+    parser.add_argument("--arch", default=None, help="filter to one arch (mlp|conv_snn)")
     parser.add_argument("--n-boot", type=int, default=5000)
     args = parser.parse_args()
 
@@ -61,6 +62,8 @@ def main() -> None:
     rows = [r for r in rows if r.get("dead_network", "False") != "True"]
     if args.dataset is not None:
         rows = [r for r in rows if r.get("dataset", "mnist") == args.dataset]
+    if args.arch is not None:
+        rows = [r for r in rows if r.get("arch", "mlp") == args.arch]
     if len(rows) < 3:
         print(f"[mediation] only {len(rows)} live conditions; need >= 3.")
         return
@@ -87,6 +90,7 @@ def main() -> None:
         "exploratory": True,
         "note": "pilot-scale screen, not confirmatory; needs more seeds for a confirmatory estimate",
         "dataset_filter": args.dataset,
+        "arch_filter": args.arch,
         "n": res.n,
         "total_effect_c": res.total_effect_c,
         "a_path": res.a_path,
