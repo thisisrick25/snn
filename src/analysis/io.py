@@ -32,6 +32,8 @@ class ConditionRecord:
     dead_network: bool = False
     dataset: str = "mnist"
     arch: str = "mlp"
+    mechanism: str = "threshold"
+    control_condition: str = "none"
     train_losses: list[list[float]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -63,7 +65,11 @@ def _json_safe(value: Any) -> Any:
 
 def save_condition(raw_dir: str, record: ConditionRecord) -> str:
     """Write one condition's JSON. Returns the file path."""
-    fname = f"seed{record.seed}_{record.dataset}_{record.arch}_frac{record.threshold:.3g}.json"
+    fname = (
+        f"seed{record.seed}_{record.dataset}_{record.arch}"
+        f"_{record.mechanism}_{record.control_condition}"
+        f"_act{record.mean_observed_activity:.3g}.json"
+    )
     path = os.path.join(raw_dir, fname)
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(_json_safe(record.to_dict()), fh, indent=2)
@@ -88,6 +94,8 @@ _SUMMARY_COLUMNS = (
     "seed",
     "dataset",
     "arch",
+    "mechanism",
+    "control_condition",
     "threshold",
     "mean_observed_activity",
     "final_avg_accuracy",

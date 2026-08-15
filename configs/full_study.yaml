@@ -1,0 +1,56 @@
+# Full-study experiment configuration.
+# Confirmatory run: 2 settings (MNIST-MLP, CIFAR-Conv-SNN) x 3 mechanisms
+# (kwta_window, activity_reg, threshold) x matched-activity grid x 9 seeds,
+# plus the 3 confound controls on a dense (threshold) reference.
+# Analysed by src/scripts/run_confirmatory.py. Results land in results/full_study.
+
+# --- Reproducibility ---
+seeds: [0, 1, 2, 3, 4, 5, 6, 7, 8]   # 9 seeds; confirmatory (Holm-Bonferroni / BH-FDR)
+
+# --- Dataset (task-incremental, 5 binary tasks) ---
+dataset: mnist             # overridden per-command with --dataset
+arch: mlp                  # overridden per-command with --arch
+data_root: "./data"
+tasks:
+  - [0, 1]
+  - [2, 3]
+  - [4, 5]
+  - [6, 7]
+  - [8, 9]
+batch_size: 128
+
+# --- Model (LIF-SNN) ---
+input_dim: 784             # run_pilot derives 784 (mnist) / 3072 (cifar10) at runtime
+hidden_dims: [256, 256]
+n_classes_per_task: 2
+timesteps: 25
+tau_mem: 20.0
+beta: 0.951229
+v_reset: 0.0
+
+# --- Training (naive sequential) ---
+lr: 0.001
+epochs_per_task: 10
+
+# --- Resource limits ---
+num_threads: 0             # 0 = all cores (GPU run; override with --threads if desktop needed)
+device: auto               # auto = cuda if available
+
+# --- Sparsity mechanism ---
+sparsity_mode: kwta_window # overridden per-command with --sparsity-mode
+kwta_fractions: [0.05, 0.10, 0.20, 0.30]
+thresholds: [1.5, 3.0, 5.0, 8.0, 16.0, 24.0, 32.0, 48.0, 64.0]
+
+# --- Activity-regularization mechanism ---
+activity_reg_lambda: 1.0
+activity_reg_calibrate: true
+activity_targets: [0.05, 0.10, 0.20, 0.30]
+
+# --- Confound controls (dense reference; run with --sparsity-mode threshold) ---
+control_condition: none    # overridden per-command with --control
+control_dropout_p: 0.5     # activation_dropout target drop fraction
+control_freeze_fraction: 0.5   # block_freeze fixed-frozen neuron fraction
+control_max_norm: 1.0      # update_norm gradient-clip max norm
+
+# --- Output paths ---
+results_dir: "./results/full_study"

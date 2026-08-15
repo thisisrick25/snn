@@ -34,6 +34,8 @@ def run_naive_sequential(
     timesteps: int,
     activity_max_batches: int | None = 8,
     device: str = "cpu",
+    control: dict | None = None,
+    progress: str | None = None,
 ) -> ContinualResult:
     """Run naive sequential CL and fill the accuracy matrix.
 
@@ -46,7 +48,9 @@ def run_naive_sequential(
     observed_activity: list[float] = []
 
     for i in range(n_tasks):
-        losses = train_task(model, train_loaders[i], task_id=i, epochs=epochs, lr=lr, device=device)
+        task_progress = f"{progress} task {i + 1}/{n_tasks}" if progress is not None else None
+        losses = train_task(model, train_loaders[i], task_id=i, epochs=epochs, lr=lr,
+                            device=device, control=control, progress=task_progress)
         train_losses.append(losses)
 
         # Log observed activity on the just-trained task (uses frozen threshold).

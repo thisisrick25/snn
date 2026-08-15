@@ -132,3 +132,12 @@ def mediation_analysis(
         indirect_ci_high=float(ci_high),
         proportion_mediated=float(proportion),
     )
+
+
+from src.analysis.confirmatory_estimator import confirmatory_mediation_analysis  # noqa: E402
+from src.analysis.confirmatory_types import (  # noqa: E402
+    BootstrapSummary,
+    ConfirmatorySettingResult,
+    ConfirmatoryStudyResult,
+    PointEstimates,
+)

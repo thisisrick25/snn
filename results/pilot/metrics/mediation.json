@@ -1,18 +1,18 @@
 {
   "exploratory": true,
   "note": "pilot-scale screen, not confirmatory; needs more seeds for a confirmatory estimate",
-  "dataset_filter": "cifar10",
-  "arch_filter": "conv_snn",
-  "n": 18,
-  "total_effect_c": -0.00281639818984374,
-  "a_path": 0.8145192906027097,
-  "b_path": 0.036934171455928214,
-  "direct_effect_c_prime": -0.032899993323125244,
-  "indirect_effect": 0.030083595133281498,
+  "dataset_filter": null,
+  "arch_filter": null,
+  "n": 54,
+  "total_effect_c": -0.3604774869897833,
+  "a_path": -0.17996074320065195,
+  "b_path": -0.2824273446145076,
+  "direct_effect_c_prime": -0.4113033218267968,
+  "indirect_effect": 0.05082583483701343,
   "indirect_ci": [
-    -0.9729965440454453,
-    0.7294588280417416
+    0.0010063778059328475,
+    0.1276623121289331
   ],
-  "proportion_mediated": -10.681584458393152,
-  "verdict": "NO EVIDENCE of mediation beyond activity co-variation (indirect CI includes 0)"
+  "proportion_mediated": -0.1409958642949981,
+  "verdict": "PARTIAL: indirect effect nonzero but direct effect did not shrink"
 }

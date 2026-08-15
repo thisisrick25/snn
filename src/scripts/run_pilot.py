@@ -57,6 +57,7 @@ from src.data.split_mnist import build_split_mnist
 from src.data.split_cifar import build_split_cifar
 from src.models.lif_snn import build_model
 from src.models.conv_snn import build_conv_model
+from src.training.activity_calibration import calibrate_lambda
 from src.training.continual import run_naive_sequential
 from src.analysis.metrics import compute_metrics
 from src.analysis.representations import fixed_subset_loader, extract_representation
@@ -126,9 +127,35 @@ def run_condition(cfg: dict, seed: int, condition: float, *, probe_samples: int,
     if not is_conv:
         cfg["input_dim"] = _INPUT_DIM[cfg.get("dataset", "mnist")]
 
+    # Route the confound control: activation_dropout is model-level (build_model
+    # reads cfg["control_dropout_p"]), so it must be set BEFORE construction and
+    # passes no train-loop control; update_norm/block_freeze are train-loop-level.
+    control_condition = cfg.get("control_condition", "none")
+    control = None
+    if control_condition == "update_norm":
+        control = {"kind": "update_norm", "max_norm": float(cfg.get("control_max_norm", 1.0))}
+    elif control_condition == "block_freeze":
+        control = {"kind": "block_freeze", "fraction": float(cfg.get("control_freeze_fraction", 0.5))}
+    elif control_condition == "activation_dropout":
+        cfg["control_dropout_p"] = float(cfg.get("control_dropout_p", 0.5))
+
     # 1-2. seed + data (conv keeps CIFAR images unflattened as [3, 32, 32])
     set_seed(seed)
     train_loaders, test_loaders = build_dataset(cfg, tasks, batch_size, conv=is_conv)
+
+    # 2b. activity_reg mode: calibrate the penalty weight so the soft penalty lands
+    # near the target observed activity (a single fixed lambda cannot hit every
+    # target). The search trains throwaway models; the real run rebuilds fresh below.
+    if cfg.get("sparsity_mode", "threshold") == "activity_reg" and cfg.get("activity_reg_calibrate", True):
+        build_fn = build_conv_model if is_conv else build_model
+        calib = calibrate_lambda(
+            cfg, build_fn, train_loaders[0], train_loaders[0],
+            target=condition, device=device,
+            warmup_epochs=1 if epochs == 1 else 2,
+        )
+        cfg["activity_reg_lambda"] = calib.chosen_lambda
+        print(f"  [calib] target={condition:.3g} lambda={calib.chosen_lambda:.4g} "
+              f"obs={calib.observed_activity:.3f}", flush=True)
 
     # 3. build model for this sparsity condition. In kwta_window mode `condition`
     # is a target activity fraction (the builder derives k per layer); in threshold
@@ -142,7 +169,8 @@ def run_condition(cfg: dict, seed: int, condition: float, *, probe_samples: int,
     # 4. naive sequential CL
     result = run_naive_sequential(
         model, train_loaders, test_loaders,
-        epochs=epochs, lr=lr, timesteps=timesteps, device=device,
+        epochs=epochs, lr=lr, timesteps=timesteps, device=device, control=control,
+        progress=f"seed{seed} cond={condition:.3g}",
     )
 
     # 5. metrics
@@ -177,6 +205,8 @@ def run_condition(cfg: dict, seed: int, condition: float, *, probe_samples: int,
         dead_network=dead_network,
         dataset=cfg.get("dataset", "mnist"),
         arch=arch,
+        mechanism=cfg.get("sparsity_mode", "threshold"),
+        control_condition=control_condition,
         train_losses=result.train_losses,
     )
 
@@ -203,6 +233,10 @@ def main() -> None:
                         help="benchmark dataset (default: config dataset)")
     parser.add_argument("--arch", choices=["mlp", "conv_snn"], default=None,
                         help="model architecture (default: config arch; conv_snn needs cifar10)")
+    parser.add_argument("--sparsity-mode", choices=["threshold", "kwta_window", "activity_reg"], default=None,
+                        help="sparsity mechanism (default: config sparsity_mode)")
+    parser.add_argument("--control", choices=["none", "update_norm", "activation_dropout", "block_freeze"], default=None,
+                        help="confound control condition (default: config control_condition or none)")
     args = parser.parse_args()
 
     cfg = load_config(args.config)
@@ -214,6 +248,14 @@ def main() -> None:
     if args.arch is not None:
         cfg["arch"] = args.arch
     print(f"[cfg] arch = {cfg.get('arch', 'mlp')}", flush=True)
+
+    if args.sparsity_mode is not None:
+        cfg["sparsity_mode"] = args.sparsity_mode
+    print(f"[cfg] sparsity_mode = {cfg.get('sparsity_mode', 'threshold')}", flush=True)
+
+    if args.control is not None:
+        cfg["control_condition"] = args.control
+    print(f"[cfg] control = {cfg.get('control_condition', 'none')}", flush=True)
 
     device = resolve_device(args.device, cfg)
     print(f"[cfg] device = {device}", flush=True)
@@ -234,10 +276,11 @@ def main() -> None:
         conditions = cli_conditions
     elif mode == "kwta_window":
         conditions = [float(f) for f in cfg["kwta_fractions"]]
+    elif mode == "activity_reg":
+        conditions = [float(a) for a in cfg["activity_targets"]]
     else:
         conditions = [float(t) for t in cfg["thresholds"]]
-    label = "frac" if mode == "kwta_window" else "theta"
-    print(f"[cfg] sparsity_mode = {mode}", flush=True)
+    label = "theta" if mode == "threshold" else "target"
     epochs = 1 if args.quick else int(cfg["epochs_per_task"])
 
     dirs = ensure_dirs(cfg["results_dir"])

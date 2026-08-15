@@ -62,5 +62,18 @@ kwta_fractions: [0.01, 0.05, 0.10, 0.20, 0.30, 0.40]
 # Global firing thresholds swept only in "threshold" mode (legacy fallback).
 thresholds: [1.5, 3.0, 5.0, 8.0, 16.0, 24.0, 32.0, 48.0, 64.0]
 
+# --- Activity-regularization mechanism (full-study, 3rd mechanism) ---
+# "activity_reg": a soft L2 penalty lambda*(mean_FC_rate - target)^2 added to the
+# loss nudges observed activity toward a target. Unlike k-WTA (a hard cap), one
+# fixed lambda will not hit every target, so activity_reg conditions are
+# lambda-calibrated per target (see src/training/activity_calibration.py).
+activity_reg_lambda: 1.0                     # starting/fallback penalty weight
+activity_reg_calibrate: true                 # search lambda per target to hit it
+# Shared matched-activity grid: all three mechanisms are driven to (or binned by)
+# these observed active-neuron fractions so overlap can be compared AT matched
+# activity (the crux that lets the mediation b-path be estimated). Interpret every
+# result by the MEASURED mean_observed_activity, never the target.
+activity_targets: [0.05, 0.10, 0.20, 0.30]
+
 # --- Output paths ---
 results_dir: "./results/pilot"

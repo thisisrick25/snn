@@ -1,0 +1,584 @@
+{
+  "mediator": "cka",
+  "standardization_note": "X, M, and Y z-scored within setting before fitting.",
+  "theta_bar_study": -0.990510714470201,
+  "exploratory_note": true,
+  "primary_family": [
+    {
+      "setting": "CIFAR-Conv-SNN",
+      "hypothesis": "H2_c_bar",
+      "estimand": "c_bar",
+      "estimate": 7.511013289512415,
+      "ci": null,
+      "p_raw": 1.0,
+      "p_holm": 1.0,
+      "p_bh": 1.0
+    },
+    {
+      "setting": "CIFAR-Conv-SNN",
+      "hypothesis": "H3_u2",
+      "estimand": "u2",
+      "estimate": -1.717830470494416,
+      "ci": null,
+      "p_raw": 1.0,
+      "p_holm": 1.0,
+      "p_bh": 1.0
+    },
+    {
+      "setting": "CIFAR-Conv-SNN",
+      "hypothesis": "H4_theta_bar",
+      "estimand": "theta_bar",
+      "estimate": -1.2402590755068443,
+      "ci": null,
+      "p_raw": 1.0,
+      "p_holm": 1.0,
+      "p_bh": 1.0
+    },
+    {
+      "setting": "MNIST-MLP",
+      "hypothesis": "H2_c_bar",
+      "estimand": "c_bar",
+      "estimate": -1.6070900650323223,
+      "ci": null,
+      "p_raw": 1.0,
+      "p_holm": 1.0,
+      "p_bh": 1.0
+    },
+    {
+      "setting": "MNIST-MLP",
+      "hypothesis": "H3_u2",
+      "estimand": "u2",
+      "estimate": -115.39157858994702,
+      "ci": null,
+      "p_raw": 1.0,
+      "p_holm": 1.0,
+      "p_bh": 1.0
+    },
+    {
+      "setting": "MNIST-MLP",
+      "hypothesis": "H4_theta_bar",
+      "estimand": "theta_bar",
+      "estimate": -0.7407623534335577,
+      "ci": null,
+      "p_raw": 1.0,
+      "p_holm": 1.0,
+      "p_bh": 1.0
+    }
+  ],
+  "settings": {
+    "CIFAR-Conv-SNN": {
+      "n_rows": 18,
+      "n_seed_clusters": 3,
+      "standardization_note": "within-setting z-score over live rows",
+      "mechanisms": {
+        "threshold": {
+          "a": -2.806319052022448,
+          "b": 0.4419522700432151,
+          "c_prime": {
+            "estimate": 8.751272365019231,
+            "ci": null,
+            "p_raw": 1.0,
+            "p_holm": null,
+            "p_bh": null
+          },
+          "c": {
+            "estimate": 7.511013289512415,
+            "ci": null,
+            "p_raw": 1.0,
+            "p_holm": null,
+            "p_bh": null
+          },
+          "theta": {
+            "estimate": -1.2402590755068443,
+            "ci": null,
+            "p_raw": 1.0,
+            "p_holm": null,
+            "p_bh": null
+          },
+          "PM_descriptive": null
+        },
+        "kwta_window": {
+          "a": null,
+          "b": null,
+          "c_prime": {
+            "estimate": null,
+            "ci": null,
+            "p_raw": 1.0,
+            "p_holm": null,
+            "p_bh": null
+          },
+          "c": {
+            "estimate": null,
+            "ci": null,
+            "p_raw": 1.0,
+            "p_holm": null,
+            "p_bh": null
+          },
+          "theta": {
+            "estimate": null,
+            "ci": null,
+            "p_raw": 1.0,
+            "p_holm": null,
+            "p_bh": null
+          },
+          "PM_descriptive": null
+        },
+        "activity_reg": {
+          "a": null,
+          "b": null,
+          "c_prime": {
+            "estimate": null,
+            "ci": null,
+            "p_raw": 1.0,
+            "p_holm": null,
+            "p_bh": null
+          },
+          "c": {
+            "estimate": null,
+            "ci": null,
+            "p_raw": 1.0,
+            "p_holm": null,
+            "p_bh": null
+          },
+          "theta": {
+            "estimate": null,
+            "ci": null,
+            "p_raw": 1.0,
+            "p_holm": null,
+            "p_bh": null
+          },
+          "PM_descriptive": null
+        }
+      },
+      "theta_bar_s": {
+        "estimate": -1.2402590755068443,
+        "ci": null,
+        "p_raw": 1.0,
+        "p_holm": 1.0,
+        "p_bh": 1.0
+      },
+      "c_bar_s_H2": {
+        "estimate": 7.511013289512415,
+        "ci": null,
+        "p_raw": 1.0,
+        "p_holm": 1.0,
+        "p_bh": 1.0
+      },
+      "u2_H3": {
+        "estimate": -1.717830470494416,
+        "ci": null,
+        "p_raw": 1.0,
+        "p_holm": 1.0,
+        "p_bh": 1.0
+      },
+      "IMM": {
+        "kwta_window": {
+          "estimate": null,
+          "ci": null,
+          "p_raw": 1.0,
+          "p_holm": null,
+          "p_bh": null
+        },
+        "activity_reg": {
+          "estimate": null,
+          "ci": null,
+          "p_raw": 1.0,
+          "p_holm": null,
+          "p_bh": null
+        }
+      },
+      "diagnostics": {
+        "VIF_M": 9.405368338490423,
+        "condition_number_kappa": 776.6783561283589,
+        "mechanism_counts": {
+          "threshold": 18,
+          "kwta_window": 0,
+          "activity_reg": 0
+        },
+        "ranks": {
+          "mediator": 7,
+          "outcome": 8,
+          "total": 7,
+          "shape": 8
+        },
+        "n_columns": {
+          "mediator": 11,
+          "outcome": 14,
+          "total": 11,
+          "shape": 10
+        },
+        "dropped_columns": {
+          "mediator": [
+            "Z_kwta",
+            "Z_reg",
+            "X_Z_kwta",
+            "X_Z_reg"
+          ],
+          "outcome": [
+            "Z_kwta",
+            "Z_reg",
+            "X_Z_kwta",
+            "X_Z_reg",
+            "M_Z_kwta",
+            "M_Z_reg"
+          ],
+          "total": [
+            "Z_kwta",
+            "Z_reg",
+            "X_Z_kwta",
+            "X_Z_reg"
+          ],
+          "shape": [
+            "Z_kwta",
+            "Z_reg"
+          ]
+        },
+        "flags": [
+          "low_seed_clusters",
+          "severe_condition_number",
+          "missing_mechanism",
+          "high_bootstrap_failure_rate"
+        ],
+        "failed_bootstrap_draws": 200,
+        "successful_bootstrap_draws": 0,
+        "high_bootstrap_failure_rate": true
+      }
+    },
+    "MNIST-MLP": {
+      "n_rows": 18,
+      "n_seed_clusters": 3,
+      "standardization_note": "within-setting z-score over live rows",
+      "mechanisms": {
+        "threshold": {
+          "a": -2.1854736650900835,
+          "b": 0.33894819473975407,
+          "c_prime": {
+            "estimate": -0.8663277115991443,
+            "ci": null,
+            "p_raw": 1.0,
+            "p_holm": null,
+            "p_bh": null
+          },
+          "c": {
+            "estimate": -1.6070900650323223,
+            "ci": null,
+            "p_raw": 1.0,
+            "p_holm": null,
+            "p_bh": null
+          },
+          "theta": {
+            "estimate": -0.7407623534335577,
+            "ci": null,
+            "p_raw": 1.0,
+            "p_holm": null,
+            "p_bh": null
+          },
+          "PM_descriptive": 0.46093393864559745
+        },
+        "kwta_window": {
+          "a": null,
+          "b": null,
+          "c_prime": {
+            "estimate": null,
+            "ci": null,
+            "p_raw": 1.0,
+            "p_holm": null,
+            "p_bh": null
+          },
+          "c": {
+            "estimate": null,
+            "ci": null,
+            "p_raw": 1.0,
+            "p_holm": null,
+            "p_bh": null
+          },
+          "theta": {
+            "estimate": null,
+            "ci": null,
+            "p_raw": 1.0,
+            "p_holm": null,
+            "p_bh": null
+          },
+          "PM_descriptive": null
+        },
+        "activity_reg": {
+          "a": null,
+          "b": null,
+          "c_prime": {
+            "estimate": null,
+            "ci": null,
+            "p_raw": 1.0,
+            "p_holm": null,
+            "p_bh": null
+          },
+          "c": {
+            "estimate": null,
+            "ci": null,
+            "p_raw": 1.0,
+            "p_holm": null,
+            "p_bh": null
+          },
+          "theta": {
+            "estimate": null,
+            "ci": null,
+            "p_raw": 1.0,
+            "p_holm": null,
+            "p_bh": null
+          },
+          "PM_descriptive": null
+        }
+      },
+      "theta_bar_s": {
+        "estimate": -0.7407623534335577,
+        "ci": null,
+        "p_raw": 1.0,
+        "p_holm": 1.0,
+        "p_bh": 1.0
+      },
+      "c_bar_s_H2": {
+        "estimate": -1.6070900650323223,
+        "ci": null,
+        "p_raw": 1.0,
+        "p_holm": 1.0,
+        "p_bh": 1.0
+      },
+      "u2_H3": {
+        "estimate": -115.39157858994702,
+        "ci": null,
+        "p_raw": 1.0,
+        "p_holm": 1.0,
+        "p_bh": 1.0
+      },
+      "IMM": {
+        "kwta_window": {
+          "estimate": null,
+          "ci": null,
+          "p_raw": 1.0,
+          "p_holm": null,
+          "p_bh": null
+        },
+        "activity_reg": {
+          "estimate": null,
+          "ci": null,
+          "p_raw": 1.0,
+          "p_holm": null,
+          "p_bh": null
+        }
+      },
+      "diagnostics": {
+        "VIF_M": 5.789361341496122,
+        "condition_number_kappa": 3759.724255014592,
+        "mechanism_counts": {
+          "threshold": 18,
+          "kwta_window": 0,
+          "activity_reg": 0
+        },
+        "ranks": {
+          "mediator": 7,
+          "outcome": 8,
+          "total": 7,
+          "shape": 8
+        },
+        "n_columns": {
+          "mediator": 11,
+          "outcome": 14,
+          "total": 11,
+          "shape": 10
+        },
+        "dropped_columns": {
+          "mediator": [
+            "Z_kwta",
+            "Z_reg",
+            "X_Z_kwta",
+            "X_Z_reg"
+          ],
+          "outcome": [
+            "Z_kwta",
+            "Z_reg",
+            "X_Z_kwta",
+            "X_Z_reg",
+            "M_Z_kwta",
+            "M_Z_reg"
+          ],
+          "total": [
+            "Z_kwta",
+            "Z_reg",
+            "X_Z_kwta",
+            "X_Z_reg"
+          ],
+          "shape": [
+            "Z_kwta",
+            "Z_reg"
+          ]
+        },
+        "flags": [
+          "low_seed_clusters",
+          "severe_condition_number",
+          "missing_mechanism",
+          "high_bootstrap_failure_rate"
+        ],
+        "failed_bootstrap_draws": 200,
+        "successful_bootstrap_draws": 0,
+        "high_bootstrap_failure_rate": true
+      }
+    }
+  },
+  "secondary_families": {
+    "mechanism_indirect_exploratory": [
+      {
+        "setting": "CIFAR-Conv-SNN",
+        "estimand": "theta_threshold",
+        "estimate": -1.2402590755068443,
+        "ci": null,
+        "p_raw": 1.0,
+        "p_holm": 1.0,
+        "p_bh": 1.0
+      },
+      {
+        "setting": "CIFAR-Conv-SNN",
+        "estimand": "theta_kwta_window",
+        "estimate": null,
+        "ci": null,
+        "p_raw": 1.0,
+        "p_holm": 1.0,
+        "p_bh": 1.0
+      },
+      {
+        "setting": "CIFAR-Conv-SNN",
+        "estimand": "theta_activity_reg",
+        "estimate": null,
+        "ci": null,
+        "p_raw": 1.0,
+        "p_holm": 1.0,
+        "p_bh": 1.0
+      },
+      {
+        "setting": "MNIST-MLP",
+        "estimand": "theta_threshold",
+        "estimate": -0.7407623534335577,
+        "ci": null,
+        "p_raw": 1.0,
+        "p_holm": 1.0,
+        "p_bh": 1.0
+      },
+      {
+        "setting": "MNIST-MLP",
+        "estimand": "theta_kwta_window",
+        "estimate": null,
+        "ci": null,
+        "p_raw": 1.0,
+        "p_holm": 1.0,
+        "p_bh": 1.0
+      },
+      {
+        "setting": "MNIST-MLP",
+        "estimand": "theta_activity_reg",
+        "estimate": null,
+        "ci": null,
+        "p_raw": 1.0,
+        "p_holm": 1.0,
+        "p_bh": 1.0
+      }
+    ],
+    "moderation_exploratory": [
+      {
+        "setting": "CIFAR-Conv-SNN",
+        "estimand": "IMM_kwta_window",
+        "estimate": null,
+        "ci": null,
+        "p_raw": 1.0,
+        "p_holm": 1.0,
+        "p_bh": 1.0
+      },
+      {
+        "setting": "CIFAR-Conv-SNN",
+        "estimand": "IMM_activity_reg",
+        "estimate": null,
+        "ci": null,
+        "p_raw": 1.0,
+        "p_holm": 1.0,
+        "p_bh": 1.0
+      },
+      {
+        "setting": "MNIST-MLP",
+        "estimand": "IMM_kwta_window",
+        "estimate": null,
+        "ci": null,
+        "p_raw": 1.0,
+        "p_holm": 1.0,
+        "p_bh": 1.0
+      },
+      {
+        "setting": "MNIST-MLP",
+        "estimand": "IMM_activity_reg",
+        "estimate": null,
+        "ci": null,
+        "p_raw": 1.0,
+        "p_holm": 1.0,
+        "p_bh": 1.0
+      }
+    ],
+    "overlap_cosine_secondary_mediator_exploratory": [
+      {
+        "setting": "CIFAR-Conv-SNN",
+        "hypothesis": "H2_c_bar",
+        "estimand": "c_bar",
+        "estimate": 7.511013289512415,
+        "ci": null,
+        "p_raw": 1.0,
+        "p_holm": 1.0,
+        "p_bh": 1.0
+      },
+      {
+        "setting": "CIFAR-Conv-SNN",
+        "hypothesis": "H3_u2",
+        "estimand": "u2",
+        "estimate": -1.717830470494416,
+        "ci": null,
+        "p_raw": 1.0,
+        "p_holm": 1.0,
+        "p_bh": 1.0
+      },
+      {
+        "setting": "CIFAR-Conv-SNN",
+        "hypothesis": "H4_theta_bar",
+        "estimand": "theta_bar",
+        "estimate": -1.35236722003753,
+        "ci": null,
+        "p_raw": 1.0,
+        "p_holm": 1.0,
+        "p_bh": 1.0
+      },
+      {
+        "setting": "MNIST-MLP",
+        "hypothesis": "H2_c_bar",
+        "estimand": "c_bar",
+        "estimate": -1.6070900650323223,
+        "ci": null,
+        "p_raw": 1.0,
+        "p_holm": 1.0,
+        "p_bh": 1.0
+      },
+      {
+        "setting": "MNIST-MLP",
+        "hypothesis": "H3_u2",
+        "estimand": "u2",
+        "estimate": -115.39157858994702,
+        "ci": null,
+        "p_raw": 1.0,
+        "p_holm": 1.0,
+        "p_bh": 1.0
+      },
+      {
+        "setting": "MNIST-MLP",
+        "hypothesis": "H4_theta_bar",
+        "estimand": "theta_bar",
+        "estimate": 0.20143632634845993,
+        "ci": null,
+        "p_raw": 1.0,
+        "p_holm": 1.0,
+        "p_bh": 1.0
+      }
+    ]
+  }
+}
