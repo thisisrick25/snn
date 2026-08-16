@@ -19,9 +19,10 @@ if [ "$threads" -gt 0 ]; then thread_args=(--threads "$threads"); fi
 n_seeds=9
 
 # Count raw JSONs already present for a (dataset, arch, mechanism, control) cell.
+# find (not ls|wc) so a zero-match cell exits 0 and never trips set -e/pipefail.
 count_done() {
     local ds="$1" arch="$2" mech="$3" ctrl="$4"
-    ls "$raw"/seed*_"${ds}"_"${arch}"_"${mech}"_"${ctrl}"_*.json 2>/dev/null | wc -l
+    find "$raw" -maxdepth 1 -name "seed*_${ds}_${arch}_${mech}_${ctrl}_*.json" 2>/dev/null | wc -l
 }
 
 run_pilot() {
