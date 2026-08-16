@@ -26,6 +26,8 @@ Usage (from repo root):
 from __future__ import annotations
 
 import argparse
+import glob
+import json
 import os
 import sys
 
@@ -156,6 +158,11 @@ def run_condition(cfg: dict, seed: int, condition: float, *, probe_samples: int,
         cfg["activity_reg_lambda"] = calib.chosen_lambda
         print(f"  [calib] target={condition:.3g} lambda={calib.chosen_lambda:.4g} "
               f"obs={calib.observed_activity:.3f}", flush=True)
+        # Calibration trains throwaway models and internally re-seeds to seeds[0],
+        # which leaves the RNG on a seed-independent state. Re-seed here so the real
+        # activity_reg run below starts from this condition's per-seed RNG state
+        # (otherwise every seed produces identical activity_reg results).
+        set_seed(seed)
 
     # 3. build model for this sparsity condition. In kwta_window mode `condition`
     # is a target activity fraction (the builder derives k per layer); in threshold
@@ -211,6 +218,22 @@ def run_condition(cfg: dict, seed: int, condition: float, *, probe_samples: int,
     )
 
 
+def _already_done(raw_dir, seed, dataset, arch, mechanism, control_condition, condition) -> bool:
+    # Resume support: the saved filename encodes OBSERVED activity (unknown before a
+    # run), not the swept condition, so we match on the stored `threshold` field
+    # (== the swept condition value) inside any raw JSON sharing this run's prefix.
+    prefix = f"seed{seed}_{dataset}_{arch}_{mechanism}_{control_condition}_"
+    for path in glob.glob(os.path.join(raw_dir, prefix + "*.json")):
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                stored = json.load(fh).get("threshold")
+        except (OSError, ValueError):
+            continue
+        if stored is not None and abs(float(stored) - float(condition)) < 1e-9:
+            return True
+    return False
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run the Split-MNIST LIF-SNN sparsity pilot.")
     parser.add_argument("--config", default="configs/pilot.yaml")
@@ -237,6 +260,8 @@ def main() -> None:
                         help="sparsity mechanism (default: config sparsity_mode)")
     parser.add_argument("--control", choices=["none", "update_norm", "activation_dropout", "block_freeze"], default=None,
                         help="confound control condition (default: config control_condition or none)")
+    parser.add_argument("--resume", action=argparse.BooleanOptionalAction, default=True,
+                        help="skip conditions already present in raw/ (--no-resume forces recompute)")
     args = parser.parse_args()
 
     cfg = load_config(args.config)
@@ -285,8 +310,17 @@ def main() -> None:
 
     dirs = ensure_dirs(cfg["results_dir"])
 
+    dataset = cfg.get("dataset", "mnist")
+    arch = cfg.get("arch", "mlp")
+    control_condition = cfg.get("control_condition", "none")
+
     for seed in seeds:
         for condition in conditions:
+            if args.resume and _already_done(
+                dirs["raw"], seed, dataset, arch, mode, control_condition, condition
+            ):
+                print(f"[skip] seed={seed} {label}={condition:.3g} already done", flush=True)
+                continue
             print(f"[run] seed={seed} {label}={condition:.3g} epochs={epochs}", flush=True)
             record = run_condition(
                 cfg, seed, condition,

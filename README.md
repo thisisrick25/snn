@@ -116,6 +116,130 @@ freeze the desktop. Two independent controls:
 - **Metrics:** accuracy matrix, final average accuracy, per-task forgetting, mean forgetting, observed activity, representational overlap (linear CKA + cosine).
 - **Note:** under this configuration the network fires at most ~38% of neurons (an activity ceiling); very high thresholds produce a degenerate "dead network" that is auto-flagged (`dead_network`) and excluded from mechanism analysis.
 
+## Running the full study
+
+The pilot is a single-mechanism screen. The **full study** runs the complete matrix
+across two settings, three sparsity mechanisms, and three confound controls, then fits the
+confirmatory mediation analysis. It is configured by `configs/full_study.yaml`
+(`results_dir: ./results/full_study`, `seeds: 0..8` = 9 seeds).
+
+### The matrix (12 runs)
+
+| Block | Runs | What |
+|---|---|---|
+| Core | 6 | 2 settings `{mnist/mlp, cifar10/conv_snn}` × 3 mechanisms `{kwta_window, activity_reg, threshold}` |
+| Controls | 6 | 2 settings × 3 confound controls `{update_norm, activation_dropout, block_freeze}`, each on a dense (`--sparsity-mode threshold`) reference |
+
+Each run sweeps its mechanism's whole grid across all 9 seeds, so the expected JSON count
+per cell is:
+
+| Cell | Conditions × seeds | Expected JSONs |
+|---|---|---|
+| `kwta_window` | 4 fractions × 9 | 36 |
+| `activity_reg` | 4 targets × 9 | 36 |
+| `threshold` | 9 thetas × 9 | 81 |
+| each control | 1 × 9 | 9 |
+
+After all runs, `run_confirmatory` fits the analysis over the accumulated `summary.csv`.
+
+### Launch
+
+The wrappers run all 12 cells sequentially and then the confirmatory analysis. Both are
+**skip-aware** (see Resume below), so re-running them only fills in what is missing.
+
+```powershell
+# Windows
+.\run_full_study.ps1               # all cores
+.\run_full_study.ps1 -Threads 4    # cap CPU threads to keep the desktop usable
+```
+
+```bash
+# Linux / Kaggle
+bash run_full_study.sh             # all cores
+bash run_full_study.sh 4           # optional thread cap
+```
+
+Or run any single cell directly (all output goes to `results/full_study/` via the config's
+`results_dir`; there is **no `--results-dir` flag**):
+
+```powershell
+python -m src.scripts.run_pilot --config configs/full_study.yaml --dataset mnist --arch mlp --sparsity-mode kwta_window
+python -m src.scripts.run_pilot --config configs/full_study.yaml --dataset cifar10 --arch conv_snn --sparsity-mode threshold --control block_freeze
+python -m src.scripts.run_confirmatory --config configs/full_study.yaml
+```
+
+Results land in `results/full_study/`:
+
+- `raw/` — one JSON per `(seed, condition)`, named
+  `seed{S}_{dataset}_{arch}_{mechanism}_{control}_act{observed:.3g}.json`
+- `metrics/summary.csv` — one row per condition (rebuilt from the **whole** `raw/` dir at the
+  end of every run, so it always reflects all accumulated conditions)
+- `metrics/confirmatory.json` — the confirmatory mediation output
+
+## Resume mechanism
+
+Long runs (especially `cifar10/conv_snn`) can outlast a machine session or a Kaggle time
+limit. The study is designed to resume cleanly with **zero wasted recomputation**, at three
+layers:
+
+**1. Per-condition durability.** `run_pilot` writes one JSON to `results/<results_dir>/raw/`
+*immediately* after each `(seed, condition)` finishes, and rebuilds `summary.csv` from the
+entire `raw/` directory at the end. Accumulation is order-independent: interrupted runs never
+lose already-finished conditions, and partial runs merge cleanly.
+
+**2. Per-condition skip (`--resume`, default ON).** Before training each `(seed, condition)`,
+`run_pilot` checks whether that condition is already on disk and skips it if so, printing
+`[skip] seed=… θ=… already done`. This gives true **mid-mechanism** resume — a cell killed
+after seed 3 of 9 resumes at seed 4, not seed 0.
+
+The filename encodes the *observed* activity (unknown before the run finishes), **not** the
+swept condition, so the skip check does not rely on the filename. Instead `_already_done()`
+globs every raw JSON sharing the run's prefix
+(`seed{S}_{dataset}_{arch}_{mechanism}_{control}_*.json`), reads the `threshold` field stored
+inside each (which equals the swept condition value), and skips when it matches within `1e-9`.
+
+Pass `--no-resume` to force recomputation (overwrites existing JSONs for those conditions).
+
+**3. Per-cell skip (wrappers).** `run_full_study.ps1` / `run_full_study.sh` count the raw
+JSONs for each cell and skip launching a cell whose count already meets the expected total
+(table above), printing `[skip] … complete (have/expected)`. So a fully-finished mechanism
+costs nothing on a re-run, while a partially-finished one is relaunched and its `--resume`
+guard fills only the missing seeds.
+
+### Resuming on Kaggle
+
+Kaggle wipes `/kaggle/working` between sessions and caps each session (~9 h), so resume
+requires **persisting `raw/` yourself**:
+
+1. **Persist between sessions.** Save `results/full_study/raw/` as a Kaggle *Dataset* (or via
+   a notebook *Commit*), and at the start of each new session restore those JSONs back into
+   `results/full_study/raw/` before running. Without this, there is nothing to resume from.
+2. **One cell per session.** Run a single mechanism at a time — especially each
+   `cifar10/conv_snn` mechanism — to stay under the session limit.
+3. **Install without pinning CUDA.** `pip install torch torchvision snntorch pyyaml numpy`
+   (do **not** pin `+cu132`; the code is device-agnostic via `device: auto`). Set
+   `export PYTHONPATH=$PWD`. Datasets auto-download via torchvision into `./data`.
+4. Re-run `bash run_full_study.sh` each session; the skip layers ensure only missing work
+   runs, and finish with `python -m src.scripts.run_confirmatory --config configs/full_study.yaml`.
+
+### Important: regenerate the `activity_reg` arm
+
+An earlier bug made `activity_reg` results **seed-invariant** (identical across all 9 seeds,
+so effective *n* = 1). Root cause: the λ-calibration step
+(`src/training/activity_calibration.py`) re-seeds to `seeds[0]` and left the RNG parked on
+that state, so the real `activity_reg` model always trained from the seed-0 RNG. The fix
+re-applies `set_seed(seed)` after calibration and before model construction in
+`run_pilot.run_condition`. The `threshold` and `kwta_window` arms never used calibration and
+are unaffected.
+
+Any `activity_reg` JSONs produced before the fix are invalid. Delete them and regenerate:
+
+```bash
+rm results/full_study/raw/*_activity_reg_*.json     # PowerShell: Remove-Item results/full_study/raw/*_activity_reg_*.json
+python -m src.scripts.run_pilot --config configs/full_study.yaml --dataset mnist   --arch mlp      --sparsity-mode activity_reg
+python -m src.scripts.run_pilot --config configs/full_study.yaml --dataset cifar10 --arch conv_snn --sparsity-mode activity_reg
+```
+
 ## Project documents
 
 - `RESEARCH_IDEA_REFINED.md` — the refined proposal (research questions, hypotheses H1–H4, confound controls, mediation model).
