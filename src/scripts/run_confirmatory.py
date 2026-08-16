@@ -9,6 +9,7 @@ from pathlib import Path
 import yaml
 
 from src.analysis.confirmatory_report import confirmatory_json
+from src.analysis.io import ensure_dirs, load_conditions, save_summary_csv
 from src.analysis.mediation import confirmatory_mediation_analysis
 
 
@@ -17,10 +18,26 @@ def _load_rows(path: Path) -> list[dict[str, str]]:
         return [row for row in csv.DictReader(handle) if row.get("dead_network") != "True"]
 
 
-def _summary_path(config_path: Path) -> Path:
+def _results_dir(config_path: Path) -> str:
     with config_path.open() as handle:
         cfg = yaml.safe_load(handle)
-    return Path(cfg["results_dir"]) / "metrics" / "summary.csv"
+    return str(cfg["results_dir"])
+
+
+def _ensure_summary(results_dir: str) -> Path:
+    """Return the summary.csv path, rebuilding it from raw/*.json when absent.
+
+    run_full_study.sh may skip every already-complete cell, so run_pilot (the
+    only writer of summary.csv) never runs; without this rebuild the confirmatory
+    step would abort on a missing summary even though the raw records exist.
+    """
+    dirs = ensure_dirs(results_dir)
+    summary_path = Path(dirs["metrics"]) / "summary.csv"
+    if not summary_path.exists():
+        records = load_conditions(dirs["raw"])
+        if records:
+            save_summary_csv(dirs["metrics"], records)
+    return summary_path
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -31,9 +48,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--random-state", type=int, default=0)
     args = parser.parse_args(argv)
 
-    summary_path = _summary_path(Path(args.config))
+    summary_path = _ensure_summary(_results_dir(Path(args.config)))
     if not summary_path.exists():
-        print(f"[confirmatory] no summary at {summary_path}; run the pilot first.")
+        print(f"[confirmatory] no summary at {summary_path} and no raw records; run the pilot first.")
         return 1
 
     rows = _load_rows(summary_path)
