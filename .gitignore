@@ -9,7 +9,8 @@ __pycache__/
 
 # Experiment outputs
 # results/ kept tracked (small: pilot summary + json evidence)
-data/
+# anchored to repo root so it does NOT match the src/data/ package
+/data/
 
 # Session / agent state
 .omo/
